@@ -5,6 +5,7 @@ import { Product, ProductsService } from '../catalog/products.service';
 import { AppError } from '../common/app-error';
 import { APP_CONFIG, AppConfig } from '../config';
 import { DatabaseService } from '../database/database.service';
+import { MetricsService } from '../metrics/metrics.module';
 import { ProviderRequest, TOPUP_PROVIDER, TopupProvider } from './provider/topup-provider';
 
 export type SaleChannel = 'PORTAL' | 'PARTNER';
@@ -75,6 +76,7 @@ export class SalesService {
     private readonly products: ProductsService,
     @Inject(TOPUP_PROVIDER) private readonly provider: TopupProvider,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly metrics: MetricsService,
   ) {}
 
   /**
@@ -158,7 +160,10 @@ export class SalesService {
       destination: command.destination,
     });
 
-    return { sale: await this.applyOutcome(reserved.row, outcome), replayed: false };
+    const sale = await this.applyOutcome(reserved.row, outcome);
+    this.metrics.sales.inc({ status: sale.status, channel: sale.channel });
+
+    return { sale, replayed: false };
   }
 
   async getSale(saleId: string, posId?: string): Promise<Sale> {
