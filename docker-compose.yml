@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: paypoint
+      POSTGRES_USER: paypoint
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paypoint -d paypoint"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://paypoint:${POSTGRES_PASSWORD}@postgres:5432/paypoint
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      CORS_ORIGIN: http://localhost:8081
+      # nginx sits in front of the API, so trust one proxy hop for the client IP.
+      TRUST_PROXY: 1
+      SEED_DEMO_DATA: "true"
+      DEMO_PASSWORD: ${DEMO_PASSWORD:?Set DEMO_PASSWORD in .env}
+      DEMO_PARTNER_SECRET: ${DEMO_PARTNER_SECRET:?Set DEMO_PARTNER_SECRET in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8081:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Test profile: a separate, disposable database so tests never touch demo data.
+  postgres-test:
+    image: postgres:16-alpine
+    profiles: [test]
+    environment:
+      POSTGRES_DB: paypoint_test
+      POSTGRES_USER: paypoint
+      POSTGRES_PASSWORD: paypoint_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paypoint -d paypoint_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  backend-test:
+    build:
+      context: ./backend
+      target: test
+    profiles: [test]
+    environment:
+      DATABASE_URL: postgres://paypoint:paypoint_test@postgres-test:5432/paypoint_test
+      JWT_SECRET: e2e-test-secret-that-is-at-least-32-chars
+      PROVIDER_TIMEOUT_MS: 300
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
