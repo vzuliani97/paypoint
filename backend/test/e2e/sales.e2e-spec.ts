@@ -46,6 +46,15 @@ describe('Sales through the portal', () => {
     expect(await ledgerSum(ctx.pool, posId)).toBe(15_000);
   });
 
+  it('exposes sales and HTTP metrics for Prometheus outside the /api prefix', async () => {
+    await sell({ productId: products.topup, amount: 5_000, destination: '3001234567' }).expect(201);
+
+    const metrics = await ctx.http().get('/metrics').expect(200);
+
+    expect(metrics.text).toMatch(/paypoint_sales_total\{status="CONFIRMED",channel="PORTAL"\} \d+/);
+    expect(metrics.text).toContain('route="/api/sales"');
+  });
+
   it('never overdraws the balance under concurrent sales', async () => {
     const responses = await Promise.all(
       Array.from({ length: 10 }, () => sell({ productId: products.topup, amount: 3_000, destination: '3001234567' })),

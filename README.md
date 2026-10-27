@@ -4,7 +4,7 @@
 
 Plataforma de recargas y pagos para una red de puntos de venta. Cada punto de venta tiene un saldo prepagado con el que vende recargas de celular y gift cards, ya sea desde un portal web o desde los sistemas de un integrador a través de una API B2B firmada.
 
-*English: prepaid top-up and payments platform for a network of points of sale. NestJS + TypeScript + PostgreSQL API with an append-only balance ledger, idempotent sales that never overdraw under concurrency, automatic refunds, and a B2B API secured with HMAC-SHA256 request signing and IP allowlisting. React portal, Docker, 32 automated tests in CI.*
+*English: prepaid top-up and payments platform for a network of points of sale. NestJS + TypeScript + PostgreSQL API with an append-only balance ledger, idempotent sales that never overdraw under concurrency, automatic refunds, and a B2B API secured with HMAC-SHA256 request signing and IP allowlisting. React portal, Docker, 33 automated tests in CI.*
 
 ## Qué resuelve
 
@@ -19,9 +19,9 @@ Plataforma de recargas y pagos para una red de puntos de venta. Cada punto de ve
 
 ## Stack
 
-- **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (driver `pg`, SQL explícito y migraciones versionadas), Zod, JWT, bcrypt, Helmet
+- **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (driver `pg`, SQL explícito y migraciones versionadas), Zod, JWT, bcrypt, Helmet, métricas Prometheus (`/metrics`, solo interno)
 - **Frontend:** React 19, TypeScript, Vite, servido con Nginx
-- **Pruebas:** Jest y Supertest (10 unitarias y 22 de integración contra PostgreSQL real)
+- **Pruebas:** Jest y Supertest (10 unitarias y 23 de integración contra PostgreSQL real)
 - **Infraestructura:** Docker multi-stage, Docker Compose, GitHub Actions
 
 ## Arquitectura
@@ -146,7 +146,7 @@ Al firmar el hash del cuerpo, cualquier cambio en el contenido invalida la firma
 - Validación estricta con Zod (se rechazan campos extra) y body limitado a 10 KB.
 - Restricciones `CHECK` y `UNIQUE` en la base de datos como última defensa.
 - Nginx sobrescribe `X-Forwarded-For`, y la API confía en exactamente un proxy, así que un cliente no puede falsificar su IP.
-- Contenedor de producción sin dependencias de desarrollo y ejecutándose como usuario sin privilegios.
+- Backend y Nginx corren como usuarios sin privilegios, y la imagen del backend no incluye dependencias de desarrollo.
 
 ## Limitaciones y siguientes pasos
 
