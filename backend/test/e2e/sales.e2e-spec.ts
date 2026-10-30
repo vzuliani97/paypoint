@@ -53,6 +53,8 @@ describe('Sales through the portal', () => {
 
     expect(metrics.text).toMatch(/paypoint_sales_total\{status="CONFIRMED",channel="PORTAL"\} \d+/);
     expect(metrics.text).toContain('route="/api/sales"');
+    // Series exist from startup at 0, so increase() also counts the first event of each kind.
+    expect(metrics.text).toMatch(/paypoint_sales_total\{status="PENDING",channel="PARTNER"\} 0/);
   });
 
   it('never overdraws the balance under concurrent sales', async () => {
