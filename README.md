@@ -9,7 +9,7 @@ The interesting part is not the CRUD. It is keeping money correct when requests 
 
 | Problem | How PayPoint handles it | Proof |
 |---|---|---|
-| Two sales spend the same balance at once | Check and debit in one conditional `UPDATE`, plus `CHECK (balance >= 0)` | 70 concurrent sales against room for 50 approve exactly 50 ([experiment](docs/concurrency-experiment.md)) |
+| Two sales spend the same balance at once | Check and debit in one conditional `UPDATE`, plus `CHECK (balance >= 0)` | 70 concurrent sales against room for 50 approve exactly 50 ([local experiment](docs/concurrency-experiment.md), not a production benchmark) |
 | A network retry charges twice | Mandatory `Idempotency-Key`, `UNIQUE (pos_id, key)`, a per-key advisory lock and a request hash | 70 concurrent retries create 1 sale; same key with a different body returns 409 |
 | The balance can't be explained | Append-only ledger; tests check that the balance equals the sum of movements | Every balance test |
 | The carrier rejects the top-up | Automatic refund, at most once per sale (enforced by a partial unique index) | Refund test |
