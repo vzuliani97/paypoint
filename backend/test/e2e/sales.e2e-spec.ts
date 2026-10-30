@@ -70,6 +70,37 @@ describe('Sales through the portal', () => {
     expect(await ledgerSum(ctx.pool, posId)).toBe(2_000);
   });
 
+  it('stays consistent under 70 concurrent sales competing for the same balance', async () => {
+    await ctx.pool.query('UPDATE points_of_sale SET balance = 100000 WHERE id = $1', [posId]);
+    await ctx.pool.query(
+      `INSERT INTO balance_movements (pos_id, type, amount, balance_after, note) VALUES ($1, 'CREDIT', 80000, 100000, 'top up')`,
+      [posId],
+    );
+
+    // 70 × 2.000 = 140.000 requested against 100.000 available: exactly 50 must succeed.
+    const responses = await Promise.all(
+      Array.from({ length: 70 }, () => sell({ productId: products.topup, amount: 2_000, destination: '3001234567' })),
+    );
+
+    expect(responses.filter((r) => r.status === 201)).toHaveLength(50);
+    expect(responses.filter((r) => r.status === 409)).toHaveLength(20);
+    expect(responses.some((r) => r.status >= 500)).toBe(false);
+    expect(await balanceOf(ctx.pool, posId)).toBe(0);
+    expect(await ledgerSum(ctx.pool, posId)).toBe(0);
+  });
+
+  it('turns 70 concurrent retries of the same request into a single sale', async () => {
+    const key = randomUUID();
+    const body = { productId: products.topup, amount: 5_000, destination: '3001234567' };
+
+    const responses = await Promise.all(Array.from({ length: 70 }, () => sell(body, key)));
+
+    expect(responses.filter((r) => r.status === 201)).toHaveLength(1);
+    expect(responses.filter((r) => r.status === 200)).toHaveLength(69);
+    expect(new Set(responses.map((r) => r.body.data.id)).size).toBe(1);
+    expect(await balanceOf(ctx.pool, posId)).toBe(15_000);
+  });
+
   it('processes concurrent retries with the same Idempotency-Key only once', async () => {
     const key = randomUUID();
     const body = { productId: products.topup, amount: 5_000, destination: '3001234567' };
