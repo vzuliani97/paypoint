@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@nestjs/common": "11.2.8",
-    "@nestjs/core": "11.2.8",
+    "@nestjs/core": "12.2.0",
     "@nestjs/jwt": "11.0.2",
     "@nestjs/platform-express": "11.2.8",
     "bcryptjs": "3.0.3",
