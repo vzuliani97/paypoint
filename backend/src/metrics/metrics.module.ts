@@ -23,6 +23,14 @@ export class MetricsService {
 
   constructor() {
     collectDefaultMetrics({ register: this.registry, prefix: 'paypoint_' });
+
+    // Export every status/channel series at 0 from startup. A counter that first appears at 1 is invisible
+    // to increase()/rate(), so the first sale after each restart would be lost from dashboards and alerts.
+    for (const status of ['CONFIRMED', 'FAILED', 'PENDING']) {
+      for (const channel of ['PORTAL', 'PARTNER']) {
+        this.sales.labels({ status, channel }).inc(0);
+      }
+    }
   }
 
   /** Express middleware. Labels by route pattern (/api/sales/:id), never by raw URL, to keep cardinality low. */
