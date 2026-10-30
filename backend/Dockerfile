@@ -1,4 +1,4 @@
-FROM node:24-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -18,7 +18,7 @@ COPY src ./src
 RUN npm run build
 
 # Production image: compiled JS and runtime dependencies only, running as a non-root user.
-FROM node:24-alpine AS production
+FROM node:25-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package*.json ./
