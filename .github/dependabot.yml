@@ -11,6 +11,10 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Major upgrades are planned migrations (e.g. NestJS 12 is ESM-only and must move as a set), not drive-by PRs.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /frontend
     schedule:
@@ -18,11 +22,23 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Major upgrades are planned migrations (e.g. NestJS 12 is ESM-only and must move as a set), not drive-by PRs.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /backend
     schedule:
       interval: weekly
+    ignore:
+      # Stay on the Node.js LTS line; odd-numbered majors are not LTS.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /frontend
     schedule:
       interval: weekly
+    ignore:
+      # Stay on the Node.js LTS line; odd-numbered majors are not LTS.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
