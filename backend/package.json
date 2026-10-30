@@ -13,10 +13,10 @@
     "test:all": "jest --runInBand"
   },
   "dependencies": {
-    "@nestjs/common": "11.1.6",
-    "@nestjs/core": "11.1.6",
+    "@nestjs/common": "11.2.8",
+    "@nestjs/core": "11.2.8",
     "@nestjs/jwt": "11.0.2",
-    "@nestjs/platform-express": "11.1.6",
+    "@nestjs/platform-express": "11.2.8",
     "bcryptjs": "3.0.3",
     "helmet": "8.3.0",
     "pg": "8.23.1",
@@ -26,7 +26,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@nestjs/testing": "11.1.6",
+    "@nestjs/testing": "11.2.8",
     "@types/express": "5.0.6",
     "@types/jest": "29.5.14",
     "@types/node": "24.19.2",
@@ -36,5 +36,8 @@
     "supertest": "7.3.1",
     "ts-jest": "29.4.15",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "multer": "2.5.0"
   }
 }
