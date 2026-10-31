@@ -18,7 +18,7 @@ The interesting part is not the CRUD. It is keeping money correct when requests 
 | The carrier times out (outcome unknown) | Sale stays `PENDING` with the money reserved; never refunded blindly | Timeout test with a provider that never answers |
 | Only authorized partners may sell | HMAC-SHA256 signature over timestamp, method, path and body hash; 5-minute window; IP allowlist with CIDR | Tampered body, stale timestamp, unknown key and wrong IP are all rejected |
 
-![Cashier view: a rejected sale refunded automatically, a confirmed sale, and the balance ledger](docs/screenshots/02-cashier-sale.png)
+![Cashier view: prepaid balance, product picker with quick amounts, and sales with a rejected top-up refunded automatically](docs/screenshots/02-cashier-sale.png)
 
 ## Stack
 

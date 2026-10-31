@@ -43,9 +43,24 @@ export function CashierPage({ token, onUnauthorized }: PageProps) {
   return (
     <div className="grid">
       <section className="card balance">
-        <span className="muted">{pos?.name ?? 'Punto de venta'}</span>
-        <span className="amount">{pos ? formatCop(pos.balance) : '—'}</span>
-        <span className="muted">Saldo disponible</span>
+        <div>
+          <span className="muted">{pos?.name ?? 'Punto de venta'} · Saldo disponible</span>
+          <div className="amount">{pos ? formatCop(pos.balance) : '—'}</div>
+        </div>
+        <div className="stats">
+          <div className="stat">
+            <strong>{sales.filter((sale) => sale.status === 'CONFIRMED').length}</strong>
+            <span>Confirmadas</span>
+          </div>
+          <div className="stat">
+            <strong>{sales.filter((sale) => sale.status === 'PENDING').length}</strong>
+            <span>En verificación</span>
+          </div>
+          <div className="stat">
+            <strong>{sales.filter((sale) => sale.status === 'FAILED').length}</strong>
+            <span>Reembolsadas</span>
+          </div>
+        </div>
       </section>
 
       <SellForm products={products} token={token} onCompleted={load} onUnauthorized={onUnauthorized} />
@@ -60,7 +75,7 @@ export function CashierPage({ token, onUnauthorized }: PageProps) {
               <th>Fecha</th>
               <th>Producto</th>
               <th>Destino</th>
-              <th>Valor</th>
+              <th className="num">Valor</th>
               <th>Estado</th>
               <th>Referencia</th>
             </tr>
@@ -71,7 +86,7 @@ export function CashierPage({ token, onUnauthorized }: PageProps) {
                 <td>{formatDate(sale.createdAt)}</td>
                 <td>{sale.productName}</td>
                 <td>{sale.destination}</td>
-                <td>{formatCop(sale.amount)}</td>
+                <td className="num">{formatCop(sale.amount)}</td>
                 <td>
                   <span className={`badge ${sale.status.toLowerCase()}`}>{STATUS_LABELS[sale.status]}</span>
                 </td>
@@ -90,8 +105,8 @@ export function CashierPage({ token, onUnauthorized }: PageProps) {
             <tr>
               <th>Fecha</th>
               <th>Tipo</th>
-              <th>Valor</th>
-              <th>Saldo después</th>
+              <th className="num">Valor</th>
+              <th className="num">Saldo después</th>
             </tr>
           </thead>
           <tbody>
@@ -99,8 +114,11 @@ export function CashierPage({ token, onUnauthorized }: PageProps) {
               <tr key={movement.id}>
                 <td>{formatDate(movement.createdAt)}</td>
                 <td>{MOVEMENT_LABELS[movement.type]}</td>
-                <td className={movement.amount < 0 ? 'negative' : 'positive'}>{formatCop(movement.amount)}</td>
-                <td>{formatCop(movement.balanceAfter)}</td>
+                <td className={`num ${movement.amount < 0 ? 'negative' : 'positive'}`}>
+                  {movement.amount > 0 ? '+' : ''}
+                  {formatCop(movement.amount)}
+                </td>
+                <td className="num">{formatCop(movement.balanceAfter)}</td>
               </tr>
             ))}
           </tbody>
@@ -109,6 +127,8 @@ export function CashierPage({ token, onUnauthorized }: PageProps) {
     </div>
   );
 }
+
+const QUICK_AMOUNTS = [2_000, 5_000, 10_000, 20_000, 50_000];
 
 interface SellFormProps {
   products: Product[];
@@ -186,19 +206,18 @@ function SellForm({ products, token, onCompleted, onUnauthorized }: SellFormProp
   return (
     <form className="card" onSubmit={submit}>
       <h2>Nueva venta</h2>
-      <label>
-        Producto
-        <select value={productId} onChange={(e) => selectProduct(Number(e.target.value))} required>
-          <option value="" disabled>
-            Selecciona un producto
-          </option>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="products" role="radiogroup" aria-label="Producto">
+        {products.map((p) => (
+          <label key={p.id} className="product">
+            <input type="radio" name="product" checked={productId === p.id} onChange={() => selectProduct(p.id)} required />
+            {p.name}
+            <small>
+              {p.type === 'GIFT_CARD' ? 'Tarjeta de regalo' : 'Recarga'} ·{' '}
+              {p.minAmount === p.maxAmount ? formatCop(p.minAmount) : `${formatCop(p.minAmount)} – ${formatCop(p.maxAmount)}`}
+            </small>
+          </label>
+        ))}
+      </div>
       <label>
         Valor (COP)
         <input
@@ -213,6 +232,20 @@ function SellForm({ products, token, onCompleted, onUnauthorized }: SellFormProp
           required
         />
       </label>
+      {product && !fixedPrice && (
+        <div className="chips" aria-label="Valores frecuentes">
+          {QUICK_AMOUNTS.filter((value) => value >= product.minAmount && value <= product.maxAmount).map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={Number(amount) === value ? 'chip active' : 'chip'}
+              onClick={() => edit(setAmount)(String(value))}
+            >
+              {formatCop(value)}
+            </button>
+          ))}
+        </div>
+      )}
       <label>
         {product?.type === 'GIFT_CARD' ? 'Correo del cliente' : 'Celular'}
         <input
@@ -225,7 +258,7 @@ function SellForm({ products, token, onCompleted, onUnauthorized }: SellFormProp
       </label>
       {result && <p className={`alert ${result.kind}`}>{result.text}</p>}
       <button type="submit" disabled={busy || !product}>
-        {busy ? 'Procesando…' : 'Vender'}
+        {busy ? 'Procesando…' : amount ? `Vender ${formatCop(Number(amount))}` : 'Vender'}
       </button>
     </form>
   );

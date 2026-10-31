@@ -37,19 +37,30 @@ export function App() {
     return <LoginPage onSignIn={signIn} />;
   }
 
+  const admin = session.user.role === 'ADMIN';
   return (
     <div className="layout">
       <header className="topbar">
-        <strong>PayPoint</strong>
-        <span className="muted">
-          {session.user.email} · {session.user.role === 'ADMIN' ? 'Administrador' : 'Cajero'}
+        <span className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            P
+          </span>
+          PayPoint
+        </span>
+        <span className="who">
+          {session.user.email}
+          <small>{admin ? 'Administrador' : 'Cajero'}</small>
         </span>
         <button className="link" onClick={signOut}>
           Salir
         </button>
       </header>
       <main>
-        {session.user.role === 'ADMIN' ? (
+        <header className="page-header">
+          <h1>{admin ? 'Administración' : 'Punto de venta'}</h1>
+          <p>{admin ? 'Puntos de venta, saldos y aliados B2B.' : 'Recargas y tarjetas de regalo con saldo prepagado.'}</p>
+        </header>
+        {admin ? (
           <AdminPage token={session.token} onUnauthorized={signOut} />
         ) : (
           <CashierPage token={session.token} onUnauthorized={signOut} />
