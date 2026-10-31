@@ -40,7 +40,7 @@ export async function createTestApp(options: { provider?: TopupProvider } = {}):
 
 export async function resetDatabase(pool: Pool): Promise<void> {
   await pool.query(
-    'TRUNCATE balance_movements, sales, partners, users, products, points_of_sale RESTART IDENTITY CASCADE',
+    'TRUNCATE balance_movements, bets, casino_transactions, selections, sports_events, sales, partners, users, products, points_of_sale RESTART IDENTITY CASCADE',
   );
 }
 

@@ -31,7 +31,7 @@ export interface Sale {
 
 export interface Movement {
   id: number;
-  type: 'CREDIT' | 'SALE' | 'REFUND';
+  type: 'CREDIT' | 'SALE' | 'REFUND' | 'BET' | 'BET_PAYOUT' | 'CASINO_DEBIT' | 'CASINO_CREDIT' | 'CASINO_ROLLBACK';
   amount: number;
   balanceAfter: number;
   note: string | null;
@@ -45,11 +45,54 @@ export interface PointOfSale {
   active: boolean;
 }
 
+export interface BoardEvent {
+  id: number;
+  league: string;
+  home: string;
+  away: string;
+  startsAt: string;
+  status: 'SCHEDULED' | 'LIVE' | 'FINISHED';
+  minute: number;
+  score: [number, number];
+  selections: Array<{ id: number; code: 'HOME' | 'DRAW' | 'AWAY'; odds: number; suspended: boolean }>;
+}
+
+export interface Bet {
+  id: string;
+  pick: 'HOME' | 'DRAW' | 'AWAY';
+  match: string;
+  league: string;
+  stake: number;
+  odds: number;
+  potentialPayout: number;
+  status: 'OPEN' | 'WON' | 'LOST' | 'VOID';
+  createdAt: string;
+}
+
+export interface CasinoGame {
+  code: string;
+  name: string;
+  kind: string;
+  minStake: number;
+  maxStake: number;
+}
+
+export interface RoundResult {
+  roundId: string;
+  game: string;
+  stake: number;
+  multiplier: number;
+  win: number;
+  balance: number;
+  replayed: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -80,7 +123,12 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new ApiError(response.status, data?.error?.code ?? 'HTTP_ERROR', data?.error?.message ?? `HTTP ${response.status}`);
+    throw new ApiError(
+      response.status,
+      data?.error?.code ?? 'HTTP_ERROR',
+      data?.error?.message ?? `HTTP ${response.status}`,
+      data?.error?.details,
+    );
   }
 
   return data as T;
@@ -92,6 +140,10 @@ const MESSAGES: Record<string, string> = {
   INVALID_AMOUNT: 'El valor está fuera del rango permitido para este producto.',
   INVALID_DESTINATION: 'El destino no es válido para este producto.',
   UNAUTHORIZED: 'Tu sesión expiró. Vuelve a ingresar.',
+  ODDS_CHANGED: 'La cuota cambió. Revisa el nuevo valor y confirma.',
+  EVENT_CLOSED: 'El partido ya terminó.',
+  MARKET_SUSPENDED: 'El mercado está suspendido en este momento.',
+  STAKE_OUT_OF_RANGE: 'El valor apostado está fuera de los límites.',
 };
 
 export function errorMessage(error: unknown): string {

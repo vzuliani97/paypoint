@@ -20,6 +20,13 @@ const schema = z.object({
   PROVIDER_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   SEED_DEMO_DATA: booleanFlag,
   DEMO_PASSWORD: z.string().min(8).default('paypoint-demo'),
+  // Live betting: a simulated odds feed keeps a board of fictitious matches moving. Tests turn it off.
+  BETTING_FEED_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
+  BETTING_FEED_INTERVAL_MS: z.coerce.number().int().min(250).default(3000),
+  BET_MIN_STAKE: z.coerce.number().int().positive().default(1000),
+  BET_MAX_STAKE: z.coerce.number().int().positive().default(500000),
+  // Shared secret of the (simulated) casino game provider that calls the seamless-wallet endpoints.
+  CASINO_PROVIDER_SECRET: z.string().min(16).default('demo-casino-provider-secret-change-me'),
   DEMO_PARTNER_SECRET: z.string().min(16).default('demo-partner-secret-change-me'),
   DEMO_PARTNER_ALLOWED_IPS: z.string().default('127.0.0.1,::1,172.16.0.0/12,192.168.0.0/16'),
 });

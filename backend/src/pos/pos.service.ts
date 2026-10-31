@@ -12,7 +12,7 @@ interface PosRow {
 
 interface MovementRow {
   id: string;
-  type: 'CREDIT' | 'SALE' | 'REFUND';
+  type: 'CREDIT' | 'SALE' | 'REFUND' | 'BET' | 'BET_PAYOUT' | 'CASINO_DEBIT' | 'CASINO_CREDIT' | 'CASINO_ROLLBACK';
   amount: number;
   balance_after: number;
   sale_id: string | null;

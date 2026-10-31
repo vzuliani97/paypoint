@@ -3,3 +3,4 @@
 process.env.DATABASE_URL ??= 'postgres://paypoint:paypoint_test@localhost:55432/paypoint_test';
 process.env.JWT_SECRET ??= 'e2e-test-secret-that-is-at-least-32-chars';
 process.env.PROVIDER_TIMEOUT_MS ??= '300';
+process.env.BETTING_FEED_ENABLED ??= 'false';

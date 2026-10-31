@@ -1,6 +1,14 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, errorMessage, Movement, PointOfSale, Product, Sale } from '../api';
 import { formatCop, formatDate, MOVEMENT_LABELS, STATUS_LABELS } from '../format';
+import { LiveBetting } from './Betting';
+import { Casino } from './Casino';
+
+const TABS = [
+  ['topups', 'Recargas'],
+  ['betting', 'Apuestas en vivo'],
+  ['casino', 'Casino'],
+] as const;
 
 interface PageProps {
   token: string;
@@ -13,6 +21,7 @@ export function CashierPage({ token, onUnauthorized }: PageProps) {
   const [sales, setSales] = useState<Sale[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<(typeof TABS)[number][0]>('topups');
 
   const load = useCallback(async () => {
     try {
@@ -41,90 +50,106 @@ export function CashierPage({ token, onUnauthorized }: PageProps) {
   }, [load]);
 
   return (
-    <div className="grid">
+    <>
+      <div className="cashier-top">
       <section className="card balance">
-        <div>
-          <span className="muted">{pos?.name ?? 'Punto de venta'} · Saldo disponible</span>
-          <div className="amount">{pos ? formatCop(pos.balance) : '—'}</div>
-        </div>
-        <div className="stats">
-          <div className="stat">
-            <strong>{sales.filter((sale) => sale.status === 'CONFIRMED').length}</strong>
-            <span>Confirmadas</span>
+          <div>
+            <span className="muted">{pos?.name ?? 'Punto de venta'} · Saldo disponible</span>
+            <div className="amount">{pos ? formatCop(pos.balance) : '—'}</div>
           </div>
-          <div className="stat">
-            <strong>{sales.filter((sale) => sale.status === 'PENDING').length}</strong>
-            <span>En verificación</span>
+          <div className="stats">
+            <div className="stat">
+              <strong>{sales.filter((sale) => sale.status === 'CONFIRMED').length}</strong>
+              <span>Confirmadas</span>
+            </div>
+            <div className="stat">
+              <strong>{sales.filter((sale) => sale.status === 'PENDING').length}</strong>
+              <span>En verificación</span>
+            </div>
+            <div className="stat">
+              <strong>{sales.filter((sale) => sale.status === 'FAILED').length}</strong>
+              <span>Reembolsadas</span>
+            </div>
           </div>
-          <div className="stat">
-            <strong>{sales.filter((sale) => sale.status === 'FAILED').length}</strong>
-            <span>Reembolsadas</span>
-          </div>
-        </div>
-      </section>
+        </section>
+        <nav className="section-tabs" aria-label="Secciones de la caja">
+          {TABS.map(([id, label]) => (
+            <button key={id} type="button" className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-      <SellForm products={products} token={token} onCompleted={load} onUnauthorized={onUnauthorized} />
+      {error && <p className="alert error">{error}</p>}
 
-      {error && <p className="alert error wide">{error}</p>}
-
+      {tab === 'topups' && (
+        <div className="grid">
+          <SellForm products={products} token={token} onCompleted={load} onUnauthorized={onUnauthorized} />
       <section className="card wide">
-        <h2>Ventas recientes</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Producto</th>
-              <th>Destino</th>
-              <th className="num">Valor</th>
-              <th>Estado</th>
-              <th>Referencia</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sales.map((sale) => (
-              <tr key={sale.id}>
-                <td>{formatDate(sale.createdAt)}</td>
-                <td>{sale.productName}</td>
-                <td>{sale.destination}</td>
-                <td className="num">{formatCop(sale.amount)}</td>
-                <td>
-                  <span className={`badge ${sale.status.toLowerCase()}`}>{STATUS_LABELS[sale.status]}</span>
-                </td>
-                <td>{sale.providerReference ?? sale.failureReason ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {sales.length === 0 && <p className="muted">Aún no hay ventas.</p>}
-      </section>
+            <h2>Ventas recientes</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Producto</th>
+                  <th>Destino</th>
+                  <th className="num">Valor</th>
+                  <th>Estado</th>
+                  <th>Referencia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map((sale) => (
+                  <tr key={sale.id}>
+                    <td>{formatDate(sale.createdAt)}</td>
+                    <td>{sale.productName}</td>
+                    <td>{sale.destination}</td>
+                    <td className="num">{formatCop(sale.amount)}</td>
+                    <td>
+                      <span className={`badge ${sale.status.toLowerCase()}`}>{STATUS_LABELS[sale.status]}</span>
+                    </td>
+                    <td>{sale.providerReference ?? sale.failureReason ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {sales.length === 0 && <p className="muted">Aún no hay ventas.</p>}
+          </section>
+        </div>
+      )}
+      {tab === 'betting' && <LiveBetting token={token} onCompleted={load} onUnauthorized={onUnauthorized} />}
+      {tab === 'casino' && <Casino token={token} onCompleted={load} onUnauthorized={onUnauthorized} />}
 
+      <div className="grid" style={{ marginTop: '1.25rem' }}>
       <section className="card wide">
-        <h2>Movimientos de saldo</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th className="num">Valor</th>
-              <th className="num">Saldo después</th>
-            </tr>
-          </thead>
-          <tbody>
-            {movements.map((movement) => (
-              <tr key={movement.id}>
-                <td>{formatDate(movement.createdAt)}</td>
-                <td>{MOVEMENT_LABELS[movement.type]}</td>
-                <td className={`num ${movement.amount < 0 ? 'negative' : 'positive'}`}>
-                  {movement.amount > 0 ? '+' : ''}
-                  {formatCop(movement.amount)}
-                </td>
-                <td className="num">{formatCop(movement.balanceAfter)}</td>
+          <h2>Movimientos de saldo</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th className="num">Valor</th>
+                <th className="num">Saldo después</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    </div>
+            </thead>
+            <tbody>
+              {movements.map((movement) => (
+                <tr key={movement.id}>
+                  <td>{formatDate(movement.createdAt)}</td>
+                  <td>{MOVEMENT_LABELS[movement.type]}</td>
+                  <td className={`num ${movement.amount < 0 ? 'negative' : 'positive'}`}>
+                    {movement.amount > 0 ? '+' : ''}
+                    {formatCop(movement.amount)}
+                  </td>
+                  <td className="num">{formatCop(movement.balanceAfter)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </>
   );
 }
 

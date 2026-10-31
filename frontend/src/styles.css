@@ -464,3 +464,303 @@ th.num {
 .login .card {
   width: min(100%, 380px);
 }
+
+/* ---------- Cashier layout ---------- */
+
+.cashier-top {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.cashier-top .balance {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.cashier-top .stats {
+  min-width: min(100%, 380px);
+}
+
+.section-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.section-tabs button {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.section-tabs button.active {
+  background: var(--night);
+  color: #fff;
+}
+
+/* ---------- Live betting ---------- */
+
+.betting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .betting {
+    grid-template-columns: 1fr;
+  }
+}
+
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.live-dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.live-dot.on {
+  color: var(--error);
+}
+
+.live-dot.on::before {
+  background: var(--error);
+  animation: pulse 1.6s infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'head head' 'teams odds';
+  gap: 0.4rem 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.match header {
+  grid-area: head;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.match .teams {
+  grid-area: teams;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+
+.match .teams span:last-child {
+  text-align: right;
+}
+
+.match .score {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.match .odds {
+  grid-area: odds;
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: 0.4rem;
+}
+
+.badge.live {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.badge.neutral {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.odd {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.45rem 0.25rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: none;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.6s;
+}
+
+.odd small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.odd.up {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.odd.down {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.odd.picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+@media (max-width: 640px) {
+  .match {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'head' 'teams' 'odds';
+  }
+
+  .match .odds {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.slip {
+  position: sticky;
+  top: 1rem;
+}
+
+.slip h2 {
+  display: flex;
+  justify-content: space-between;
+}
+
+.pick {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.8rem;
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+
+.pick-odds {
+  color: var(--accent-strong);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.payout {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  background: var(--night);
+  color: #cbd5e1;
+}
+
+.payout strong {
+  color: #fff;
+  font-size: 1.25rem;
+}
+
+/* ---------- Casino ---------- */
+
+.games {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.game {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.8rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.game input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.game:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.game-icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(140deg, #1e3a8a, #0b1530);
+  color: #c7d2fe;
+  font-size: 1.3rem;
+}
+
+.game small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.round {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.round.win {
+  background: var(--ok-soft);
+}
+
+.round.win strong {
+  color: var(--ok);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot.on::before {
+    animation: none;
+  }
+
+  .odd {
+    transition: none;
+  }
+}
