@@ -1,4 +1,4 @@
-# PayPoint interview guide
+# AtomicTrail design walkthrough
 
 ## 90-second demo
 

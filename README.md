@@ -1,9 +1,11 @@
-# PayPoint
+# AtomicTrail — Transaction Reliability Lab
 
-[![CI](https://github.com/vzuliani97/paypoint/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/paypoint/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/vzuliani97/paypoint/actions/workflows/codeql.yml/badge.svg)](https://github.com/vzuliani97/paypoint/actions/workflows/codeql.yml)
+*Formerly the PayPoint repository.*
 
-Prepaid top-up and payments platform for a network of points of sale. Each store holds a prepaid balance and sells mobile top-ups and gift cards, either from a web portal or from a partner's own system through a signed B2B API.
+[![CI](https://github.com/vzuliani97/atomictrail/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/atomictrail/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/vzuliani97/atomictrail/actions/workflows/codeql.yml/badge.svg)](https://github.com/vzuliani97/atomictrail/actions/workflows/codeql.yml)
+
+A reliability lab for a transactional API: safe state transitions in PostgreSQL ("atomic") and an auditable record of every balance movement ("trail"). The sample service inside it is **PayPoint**, a prepaid top-up and payments platform for a network of points of sale. Each store holds a prepaid balance and sells mobile top-ups and gift cards, either from a web portal or from a partner's own system through a signed B2B API. The service's code, images and metrics keep the `paypoint` name.
 
 The interesting part is not the CRUD. It is keeping money correct when requests race, retry or fail halfway.
 
@@ -23,7 +25,7 @@ The interesting part is not the CRUD. It is keeping money correct when requests 
 - **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations), Zod, JWT, bcrypt, Helmet, Prometheus metrics
 - **Frontend:** React 19 + TypeScript (Vite), served by unprivileged nginx
 - **Quality:** Jest + Supertest, 37 tests (10 unit, 27 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
-- **Delivery:** multi-stage Docker images running as non-root, Docker Compose, GitHub Actions publishing to GHCR. Deployed to Kubernetes in [PlatformOps](https://github.com/vzuliani97/platformops).
+- **Delivery:** multi-stage Docker images running as non-root, Docker Compose, GitHub Actions publishing to GHCR. Deployed to Kubernetes in [OpsCircuit](https://github.com/vzuliani97/opscircuit).
 
 ## Architecture
 
@@ -107,10 +109,12 @@ Highlights: 70-way concurrency on balance and idempotency, refunds exactly once,
 - No login rate limiting or refresh tokens.
 - The provider is simulated, so there are no real carrier integrations.
 
-## Interview guide
+## Design walkthrough
 
-[INTERVIEW_GUIDE.md](INTERVIEW_GUIDE.md) has a 90-second demo script and the hard questions this design invites, with answers that point to code and tests.
+[DESIGN_WALKTHROUGH.md](DESIGN_WALKTHROUGH.md) has a 90-second demo script and the hard questions this design invites, with answers that point to code and tests.
 
-## License
+## License and provenance
 
-MIT. All code in this repository is my own. It is an independent project inspired by transactional systems I worked on professionally, written from scratch with synthetic data; it contains no employer code or data.
+MIT.
+
+Independent portfolio reconstruction based on engineering patterns from professional work. It uses synthetic data and contains no employer code or confidential information. AI-assisted development tools were used; the implementation was reviewed and verified through tests and CI.
