@@ -214,21 +214,19 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
         <section className="sb-card">
           <h3>Mis apuestas</h3>
           {bets.length === 0 && <p className="sb-muted">Aún no hay apuestas.</p>}
-          <ul className="sb-bets">
+          <ul className="sb-bets" tabIndex={0} aria-label="Mis apuestas">
             {bets.slice(0, 8).map((bet) => (
               <li key={bet.id}>
-                <div>
+                <div className="sb-bet-top">
                   <strong>
                     {PICK_LABEL[bet.pick]} · {formatOdds(bet.odds)}
                   </strong>
-                  <span className="sb-muted">{bet.match}</span>
-                </div>
-                <div className="sb-bet-right">
                   <span className={`sb-status ${bet.status.toLowerCase()}`}>{BET_STATUS_LABELS[bet.status]}</span>
-                  <span>
-                    {formatCop(bet.stake)} → {formatCop(bet.potentialPayout)}
-                  </span>
                 </div>
+                <span className="sb-muted">{bet.match}</span>
+                <span className="sb-bet-amounts">
+                  {formatCop(bet.stake)} → {formatCop(bet.potentialPayout)}
+                </span>
               </li>
             ))}
           </ul>

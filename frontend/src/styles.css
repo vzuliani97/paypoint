@@ -978,9 +978,12 @@ th.num {
 .sb-bets {
   display: grid;
   gap: 0.5rem;
+  max-height: 21rem;
   margin: 0;
-  padding: 0;
+  padding: 0 0.25rem 0 0;
+  overflow-y: auto;
   list-style: none;
+  scrollbar-color: #334155 transparent;
 }
 
 .sb-bets li {
@@ -992,24 +995,25 @@ th.num {
   font-size: 0.82rem;
 }
 
-.sb-bets li > div {
-  display: grid;
-  gap: 0.15rem;
-  min-width: 0;
+.sb-bet-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .sb-bets strong {
   color: #fff;
 }
 
-.sb-bet-right {
-  display: flex !important;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+.sb-bet-amounts {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
 }
 
 .sb-status {
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 0.05rem 0.5rem;
   border-radius: 999px;
   font-size: 0.7rem;
