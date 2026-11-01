@@ -44,6 +44,60 @@ Everything in this repository, end to end:
 
 ![Cashier view: prepaid balance, product picker with quick amounts, and sales with a rejected top-up refunded automatically](docs/screenshots/02-cashier-sale.png)
 
+## Processes, step by step
+
+### 1. Sell a top-up
+
+1. The cashier picks a product and the amount; the request carries an `Idempotency-Key`.
+2. One conditional `UPDATE` checks and debits the balance, and the sale is committed as `PENDING` with the money reserved.
+3. The carrier is called **outside** the transaction. Approved: `CONFIRMED`. Rejected: refunded at most once. No answer: it stays `PENDING`, never refunded blindly (see the [sale flow](#sale-flow)).
+
+![Cashier: balance, products and sales with a refunded rejection](docs/screenshots/02-cashier-sale.png)
+
+### 2. Place a live bet
+
+```mermaid
+sequenceDiagram
+  participant F as Odds feed (one leader)
+  participant DB as PostgreSQL
+  participant API as NestJS API
+  participant UI as Sportsbook
+  F->>DB: every tick, minute, score and new odds (leader by advisory lock)
+  API-->>UI: Server-Sent Events, live board
+  UI->>API: POST /betting/bets with selection, stake, odds seen, Idempotency-Key
+  alt the price moved
+    API-->>UI: 409 ODDS_CHANGED with the new price
+  else same price
+    API->>DB: debit the balance, store the bet as OPEN
+    API-->>UI: 201 bet OPEN
+  end
+  F->>DB: final whistle, settle every bet, payout exactly once
+```
+
+1. The board shows live matches by league with minute, score and 1X2 odds that move up or down.
+2. A tap on a price fills the bet slip; the bet carries the odds the cashier saw. If the price moved, the API refuses with `ODDS_CHANGED` and the slip offers the new one.
+3. At the final whistle every bet is settled; a unique index guarantees one payout per bet.
+
+![Sportsbook: live matches, moving odds, bet slip and my bets](docs/screenshots/04-live-betting.png)
+
+### 3. Play the casino (seamless wallet)
+
+1. The game provider calls the wallet to debit a bet, credit a win or roll back, signing each callback with HMAC.
+2. Every callback is idempotent by the provider's transaction id: a retry gets the same answer and moves no money twice.
+3. A rollback that arrives before its debit leaves a tombstone, so the late debit is refused.
+
+![Casino wallet and the ledger with bets and payouts](docs/screenshots/05-casino.png)
+
+### 4. Partner API (B2B)
+
+Partners sign timestamp, method, path and body hash with HMAC-SHA256; the server checks it in constant time within a 5-minute window and against an IP allowlist, then runs the same idempotent sale.
+
+### 5. Administer the network
+
+The admin creates points of sale, credits their balances and watches sales across the network.
+
+![Admin: points of sale, credits and network sales](docs/screenshots/03-admin.png)
+
 ## Stack
 
 - **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations), Zod, JWT, bcrypt, Helmet, Prometheus metrics
