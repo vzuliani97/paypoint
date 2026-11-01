@@ -35,7 +35,7 @@ The interesting part is not the CRUD. It is keeping money correct when requests 
 
 The same prepaid balance funds top-ups, live sports bets and casino rounds. Every stake, payout and wallet operation is a ledger movement, so the balance stays explainable.
 
-![Live betting: a 1X2 board whose prices move in real time (green up, red down) and a bet slip with the potential payout](docs/screenshots/04-live-betting.png)
+![Live betting: sports and leagues menu, matches grouped by league with minute, score and 1X2 odds that move in real time, the bet slip and my bets](docs/screenshots/04-live-betting.png)
 
 - **Live board:** a simulated odds feed starts matches, moves the clock, scores goals and reprices the 1X2 market from the score and the time left. The browser receives it over Server-Sent Events. With several API replicas, each tick takes a PostgreSQL advisory lock, so only one replica moves the board.
 - **Bets:** a mandatory `Idempotency-Key`, a check of the odds the cashier saw against the current price, and an atomic debit. Stake limits are configurable.
