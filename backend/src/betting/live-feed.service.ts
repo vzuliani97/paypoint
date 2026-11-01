@@ -23,12 +23,19 @@ const FEED_LOCK = 'betting-live-feed';
  */
 export function matchProbabilities(diff: number, remaining: number): [number, number, number] {
   if (diff === 0) {
-    const draw = 0.27 + 0.68 * (1 - remaining);
+    // Quadratic: a level match is still open at half time and becomes a likely draw only near the end.
+    const draw = 0.27 + 0.68 * (1 - remaining) ** 2;
     return [(1 - draw) * 0.58, draw, (1 - draw) * 0.42];
   }
-  const lead = Math.abs(diff);
-  const draw = Math.max(0.02, (lead === 1 ? 0.25 : 0.08) * remaining);
-  const comeback = Math.max(0.01, (lead === 1 ? 0.12 : 0.03) * remaining ** 1.5);
+  // Chances of an equalizer and of a full comeback shrink with the lead and with the time left.
+  const lead = Math.min(Math.abs(diff), 3);
+  const [drawBase, drawPower, backBase, backPower] = [
+    [0.45, 0.8, 0.22, 1.2],
+    [0.18, 0.9, 0.06, 1.2],
+    [0.05, 1, 0.015, 1],
+  ][lead - 1];
+  const draw = Math.max(0.01, drawBase * remaining ** drawPower);
+  const comeback = Math.max(0.005, backBase * remaining ** backPower);
   const leader = 1 - draw - comeback;
   return diff > 0 ? [leader, draw, comeback] : [comeback, draw, leader];
 }

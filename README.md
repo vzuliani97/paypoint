@@ -16,6 +16,9 @@ The interesting part is not the CRUD. It is keeping money correct when requests 
 | The balance can't be explained | Append-only ledger; tests check that the balance equals the sum of movements | Every balance test |
 | The carrier rejects the top-up | Automatic refund, at most once per sale (enforced by a partial unique index) | Refund test |
 | The carrier times out (outcome unknown) | Sale stays `PENDING` with the money reserved; never refunded blindly | Timeout test with a provider that never answers |
+| Live odds move while the cashier decides | The bet carries the odds the cashier saw; if the price moved, the bet is refused with `ODDS_CHANGED` and no money moves | Odds-changed test |
+| A match ends and winners must be paid | Settlement updates only `OPEN` bets and a unique index allows one payout per bet | Settling twice pays once |
+| A casino provider retries or reverses a wallet call | Seamless wallet keyed by the provider's transaction id; a rollback that arrives before its debit leaves a tombstone | Retried debit applied once; late debit refused |
 | Only authorized partners may sell | HMAC-SHA256 signature over timestamp, method, path and body hash; 5-minute window; IP allowlist with CIDR | Tampered body, stale timestamp, unknown key and wrong IP are all rejected |
 
 ![Cashier view: prepaid balance, product picker with quick amounts, and sales with a rejected top-up refunded automatically](docs/screenshots/02-cashier-sale.png)
@@ -24,8 +27,22 @@ The interesting part is not the CRUD. It is keeping money correct when requests 
 
 - **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations), Zod, JWT, bcrypt, Helmet, Prometheus metrics
 - **Frontend:** React 19 + TypeScript (Vite), served by unprivileged nginx
-- **Quality:** Jest + Supertest, 37 tests (10 unit, 27 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
+- **Real time:** Server-Sent Events for the live odds board, a simulated odds feed with one leader across replicas (PostgreSQL advisory lock)
+- **Quality:** Jest + Supertest, 48 tests (10 unit, 38 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
 - **Delivery:** multi-stage Docker images running as non-root, Docker Compose, GitHub Actions publishing to GHCR. Deployed to Kubernetes in [OpsCircuit](https://github.com/vzuliani97/opscircuit).
+
+## Live betting and casino
+
+The same prepaid balance funds top-ups, live sports bets and casino rounds. Every stake, payout and wallet operation is a ledger movement, so the balance stays explainable.
+
+![Live betting: a 1X2 board whose prices move in real time (green up, red down) and a bet slip with the potential payout](docs/screenshots/04-live-betting.png)
+
+- **Live board:** a simulated odds feed starts matches, moves the clock, scores goals and reprices the 1X2 market from the score and the time left. The browser receives it over Server-Sent Events. With several API replicas, each tick takes a PostgreSQL advisory lock, so only one replica moves the board.
+- **Bets:** a mandatory `Idempotency-Key`, a check of the odds the cashier saw against the current price, and an atomic debit. Stake limits are configurable.
+- **Settlement:** when a match ends, winners are paid in one transaction; running it again changes nothing.
+- **Casino:** a seamless wallet the game provider calls with HMAC-signed `debit`, `credit` and `rollback` requests, idempotent by its transaction id. The cashier plays rounds through a simulated provider whose outcome is derived from the round id, so a retried round replays instead of playing again.
+
+![Casino: fictitious games, a round played through the wallet, and the ledger with bets, payouts and casino movements](docs/screenshots/05-casino.png)
 
 ## Architecture
 
@@ -79,7 +96,7 @@ make up                  # or: docker compose up --build
 make test        # whole suite in containers, against a disposable PostgreSQL
 ```
 
-Highlights: 70-way concurrency on balance and idempotency, refunds exactly once, timeout leaves the sale `PENDING`, every HMAC failure mode, role and tenant isolation (a cashier never sees another store), metrics exported from startup.
+Highlights: 70-way concurrency on balance and idempotency, refunds exactly once, timeout leaves the sale `PENDING`, every HMAC failure mode, role and tenant isolation (a cashier never sees another store), metrics exported from startup. Betting and casino: odds-changed refusal with no money moved, ten racing bets accepted only up to the balance, settlement paid once, a feed tick that ends and settles a match, the SSE stream, signed wallet callbacks applied once, and a rollback that overtakes its debit.
 
 ## Design decisions and trade-offs
 
@@ -102,6 +119,8 @@ Highlights: 70-way concurrency on balance and idempotency, refunds exactly once,
 - CI: Gitleaks over the full git history, `npm audit --omit=dev --audit-level=high`, CodeQL, actions pinned to commit SHAs, least-privilege `GITHUB_TOKEN`.
 
 ## Known limitations
+
+- **Betting and casino are a demonstration.** Teams, leagues and games are fictitious; the odds feed and the game provider are simulated. Real online betting in Colombia requires a Coljuegos license, and there are no responsible-gaming limits, player accounts or KYC here: the "wallet" is the store's prepaid balance.
 
 - **Reconciliation of `PENDING` sales** is not implemented yet (a job that asks the provider and confirms or refunds).
 - HMAC secrets are stored in plain text in the database. Production would use KMS or Secrets Manager.

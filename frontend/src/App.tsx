@@ -58,7 +58,7 @@ export function App() {
       <main>
         <header className="page-header">
           <h1>{admin ? 'Administración' : 'Punto de venta'}</h1>
-          <p>{admin ? 'Puntos de venta, saldos y aliados B2B.' : 'Recargas y tarjetas de regalo con saldo prepagado.'}</p>
+          <p>{admin ? 'Puntos de venta, saldos y aliados B2B.' : 'Recargas, apuestas deportivas en vivo y casino con saldo prepagado.'}</p>
         </header>
         {admin ? (
           <AdminPage token={session.token} onUnauthorized={signOut} />
