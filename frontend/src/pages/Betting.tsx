@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError, Bet, BoardEvent, errorMessage } from '../api';
 import { BET_STATUS_LABELS, formatCop, formatOdds } from '../format';
 
@@ -9,18 +9,29 @@ interface Props {
 }
 
 type Pick = { eventId: number; selectionId: number; code: 'HOME' | 'DRAW' | 'AWAY'; label: string; match: string; odds: number };
+type Filter = 'LIVE' | 'SCHEDULED' | 'FINISHED';
 
 const PICK_LABEL = { HOME: '1', DRAW: 'X', AWAY: '2' } as const;
-const QUICK_STAKES = [2_000, 5_000, 10_000, 20_000];
+const QUICK_STAKES = [2_000, 5_000, 10_000, 20_000, 50_000];
+const FILTERS: Array<[Filter, string]> = [
+  ['LIVE', 'En vivo'],
+  ['SCHEDULED', 'Próximos'],
+  ['FINISHED', 'Finalizados'],
+];
+const kickoff = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' });
 
 export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
   const [board, setBoard] = useState<BoardEvent[]>([]);
   const [connected, setConnected] = useState(false);
-  // Last price seen per selection, to flash a price that moved up or down.
+  // Last price and score seen, to show what moved since the previous update.
   const [moves, setMoves] = useState<Record<number, 'up' | 'down'>>({});
-  const previous = useRef<Record<number, number>>({});
+  const [goals, setGoals] = useState<Record<number, boolean>>({});
+  const previousOdds = useRef<Record<number, number>>({});
+  const previousScore = useRef<Record<number, string>>({});
   const [bets, setBets] = useState<Bet[]>([]);
   const [pick, setPick] = useState<Pick | null>(null);
+  const [filter, setFilter] = useState<Filter>('LIVE');
+  const [league, setLeague] = useState<string | null>(null);
 
   useEffect(() => {
     const source = new EventSource('/api/betting/stream');
@@ -29,14 +40,19 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
     source.onmessage = (message) => {
       const next = JSON.parse(message.data as string) as BoardEvent[];
       const changed: Record<number, 'up' | 'down'> = {};
+      const scored: Record<number, boolean> = {};
       for (const event of next) {
+        const score = event.score.join('-');
+        if (previousScore.current[event.id] !== undefined && previousScore.current[event.id] !== score) scored[event.id] = true;
+        previousScore.current[event.id] = score;
         for (const selection of event.selections) {
-          const before = previous.current[selection.id];
+          const before = previousOdds.current[selection.id];
           if (before !== undefined && before !== selection.odds) changed[selection.id] = selection.odds > before ? 'up' : 'down';
-          previous.current[selection.id] = selection.odds;
+          previousOdds.current[selection.id] = selection.odds;
         }
       }
       setMoves(changed);
+      setGoals(scored);
       setBoard(next);
     };
     return () => source.close();
@@ -60,100 +76,164 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
     return () => clearInterval(timer);
   }, [loadBets, onCompleted]);
 
+  const counts = useMemo(
+    () => Object.fromEntries(FILTERS.map(([status]) => [status, board.filter((event) => event.status === status).length])) as Record<Filter, number>,
+    [board],
+  );
+  const leagues = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const event of board) if (event.status === filter) totals.set(event.league, (totals.get(event.league) ?? 0) + 1);
+    return [...totals.entries()];
+  }, [board, filter]);
+  const visible = board.filter((event) => event.status === filter && (!league || event.league === league));
+  const grouped = useMemo(() => {
+    const groups = new Map<string, BoardEvent[]>();
+    for (const event of visible) groups.set(event.league, [...(groups.get(event.league) ?? []), event]);
+    return [...groups.entries()];
+  }, [visible]);
   const live = (selectionId: number) => board.flatMap((event) => event.selections).find((s) => s.id === selectionId);
 
   return (
-    <div className="betting">
-      <section className="card board">
-        <h2>
-          Partidos <span className={connected ? 'live-dot on' : 'live-dot'}>{connected ? 'En vivo' : 'Conectando…'}</span>
-        </h2>
-        {board.map((event) => (
-          <article key={event.id} className={`match ${event.status.toLowerCase()}`}>
-            <header>
-              <span className="muted">{event.league}</span>
-              {event.status === 'LIVE' && <span className="badge live">{event.minute}′</span>}
-              {event.status === 'SCHEDULED' && <span className="badge pending">Próximo</span>}
-              {event.status === 'FINISHED' && <span className="badge neutral">Final</span>}
-            </header>
-            <div className="teams">
-              <span>{event.home}</span>
-              <strong className="score">{event.status === 'SCHEDULED' ? 'vs' : `${event.score[0]} – ${event.score[1]}`}</strong>
-              <span>{event.away}</span>
-            </div>
-            <div className="odds">
-              {event.selections.map((selection) => (
-                <button
-                  key={selection.id}
-                  type="button"
-                  className={`odd ${moves[selection.id] ?? ''} ${pick?.selectionId === selection.id ? 'picked' : ''}`}
-                  disabled={selection.suspended}
-                  onClick={() =>
-                    setPick({
-                      eventId: event.id,
-                      selectionId: selection.id,
-                      code: selection.code,
-                      label: selection.code === 'DRAW' ? 'Empate' : selection.code === 'HOME' ? event.home : event.away,
-                      match: `${event.home} vs ${event.away}`,
-                      odds: selection.odds,
-                    })
-                  }
-                >
-                  <small>{PICK_LABEL[selection.code]}</small>
-                  {selection.suspended ? '—' : formatOdds(selection.odds)}
-                </button>
-              ))}
-            </div>
-          </article>
+    <div className="sportsbook">
+      <aside className="sb-menu" aria-label="Deportes y ligas">
+        <p className="sb-label">Deportes</p>
+        <button type="button" className="sb-sport active">
+          <span aria-hidden="true">⚽</span> Fútbol <span className="sb-count">{board.length}</span>
+        </button>
+        <p className="sb-label">Ligas</p>
+        <button type="button" className={league === null ? 'sb-league active' : 'sb-league'} onClick={() => setLeague(null)}>
+          Todas <span className="sb-count">{leagues.reduce((sum, [, n]) => sum + n, 0)}</span>
+        </button>
+        {leagues.map(([name, total]) => (
+          <button key={name} type="button" className={league === name ? 'sb-league active' : 'sb-league'} onClick={() => setLeague(name)}>
+            {name} <span className="sb-count">{total}</span>
+          </button>
         ))}
-        {board.length === 0 && <p className="muted">Cargando partidos…</p>}
-      </section>
+      </aside>
 
-      <BetSlip
-        pick={pick}
-        liveOdds={pick ? live(pick.selectionId)?.odds : undefined}
-        token={token}
-        onPlaced={() => {
-          void loadBets();
-          onCompleted();
-        }}
-        onClear={() => setPick(null)}
-        onAcceptOdds={(odds) => pick && setPick({ ...pick, odds })}
-        onUnauthorized={onUnauthorized}
-      />
+      <section className="sb-board" aria-label="Partidos">
+        <div className="sb-hero">
+          <div>
+            <span className={connected ? 'sb-live on' : 'sb-live'}>{connected ? 'EN VIVO' : 'Conectando…'}</span>
+            <h2>Apuestas deportivas</h2>
+            <p>Cuotas que se actualizan en tiempo real. Datos ficticios de demostración.</p>
+          </div>
+          <strong className="sb-hero-count">{counts.LIVE}</strong>
+        </div>
 
-      <section className="card wide">
-        <h2>Mis apuestas</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Partido</th>
-              <th>Pronóstico</th>
-              <th className="num">Cuota</th>
-              <th className="num">Apostado</th>
-              <th className="num">Pago posible</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bets.map((bet) => (
-              <tr key={bet.id}>
-                <td>{bet.match}</td>
-                <td>{PICK_LABEL[bet.pick]}</td>
-                <td className="num">{formatOdds(bet.odds)}</td>
-                <td className="num">{formatCop(bet.stake)}</td>
-                <td className="num">{formatCop(bet.potentialPayout)}</td>
-                <td>
-                  <span className={`badge ${bet.status === 'WON' ? 'confirmed' : bet.status === 'LOST' ? 'failed' : 'pending'}`}>
-                    {BET_STATUS_LABELS[bet.status]}
-                  </span>
-                </td>
-              </tr>
+        <div className="sb-filters" role="tablist" aria-label="Estado del partido">
+          {FILTERS.map(([status, label]) => (
+            <button
+              key={status}
+              type="button"
+              role="tab"
+              aria-selected={filter === status}
+              onClick={() => {
+                setFilter(status);
+                setLeague(null);
+              }}
+            >
+              {label} <span className="sb-count">{counts[status]}</span>
+            </button>
+          ))}
+        </div>
+
+        {grouped.map(([name, events]) => (
+          <div key={name} className="sb-group">
+            <div className="sb-group-head">
+              <span>{name}</span>
+              <span className="sb-cols" aria-hidden="true">
+                <span>1</span>
+                <span>X</span>
+                <span>2</span>
+              </span>
+            </div>
+            {events.map((event) => (
+              <article key={event.id} className={goals[event.id] ? 'sb-event goal' : 'sb-event'}>
+                <div className="sb-time">
+                  {event.status === 'LIVE' && <span className="sb-minute">{event.minute}′</span>}
+                  {event.status === 'SCHEDULED' && <span>{kickoff.format(new Date(event.startsAt))}</span>}
+                  {event.status === 'FINISHED' && <span>Final</span>}
+                </div>
+                <div className="sb-teams">
+                  <span>{event.home}</span>
+                  <span>{event.away}</span>
+                </div>
+                <div className="sb-score" aria-label={event.status === 'SCHEDULED' ? 'Sin iniciar' : `Marcador ${event.score[0]} a ${event.score[1]}`}>
+                  {event.status !== 'SCHEDULED' && (
+                    <>
+                      <span>{event.score[0]}</span>
+                      <span>{event.score[1]}</span>
+                    </>
+                  )}
+                </div>
+                <div className="sb-odds">
+                  {event.selections.map((selection) => (
+                    <button
+                      key={selection.id}
+                      type="button"
+                      className={`sb-odd ${moves[selection.id] ?? ''} ${pick?.selectionId === selection.id ? 'picked' : ''}`}
+                      disabled={selection.suspended}
+                      aria-label={`${PICK_LABEL[selection.code]} ${selection.suspended ? 'suspendida' : formatOdds(selection.odds)}`}
+                      onClick={() =>
+                        setPick({
+                          eventId: event.id,
+                          selectionId: selection.id,
+                          code: selection.code,
+                          label: selection.code === 'DRAW' ? 'Empate' : selection.code === 'HOME' ? event.home : event.away,
+                          match: `${event.home} vs ${event.away}`,
+                          odds: selection.odds,
+                        })
+                      }
+                    >
+                      {selection.suspended ? '🔒' : formatOdds(selection.odds)}
+                      {moves[selection.id] && <span className="sb-arrow" aria-hidden="true">{moves[selection.id] === 'up' ? '▲' : '▼'}</span>}
+                    </button>
+                  ))}
+                </div>
+              </article>
             ))}
-          </tbody>
-        </table>
-        {bets.length === 0 && <p className="muted">Aún no hay apuestas.</p>}
+          </div>
+        ))}
+        {visible.length === 0 && <p className="sb-empty">{board.length === 0 ? 'Cargando partidos…' : 'No hay partidos en esta vista.'}</p>}
       </section>
+
+      <div className="sb-side">
+        <BetSlip
+          pick={pick}
+          liveOdds={pick ? live(pick.selectionId)?.odds : undefined}
+          token={token}
+          onPlaced={() => {
+            void loadBets();
+            onCompleted();
+          }}
+          onClear={() => setPick(null)}
+          onAcceptOdds={(odds) => pick && setPick({ ...pick, odds })}
+          onUnauthorized={onUnauthorized}
+        />
+        <section className="sb-card">
+          <h3>Mis apuestas</h3>
+          {bets.length === 0 && <p className="sb-muted">Aún no hay apuestas.</p>}
+          <ul className="sb-bets">
+            {bets.slice(0, 8).map((bet) => (
+              <li key={bet.id}>
+                <div>
+                  <strong>
+                    {PICK_LABEL[bet.pick]} · {formatOdds(bet.odds)}
+                  </strong>
+                  <span className="sb-muted">{bet.match}</span>
+                </div>
+                <div className="sb-bet-right">
+                  <span className={`sb-status ${bet.status.toLowerCase()}`}>{BET_STATUS_LABELS[bet.status]}</span>
+                  <span>
+                    {formatCop(bet.stake)} → {formatCop(bet.potentialPayout)}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }
@@ -182,10 +262,10 @@ function BetSlip({ pick, liveOdds, token, onPlaced, onClear, onAcceptOdds, onUna
 
   if (!pick) {
     return (
-      <aside className="card slip empty">
-        <h2>Boleta</h2>
-        <p className="muted">Elige una cuota del tablero para armar la apuesta.</p>
-      </aside>
+      <section className="sb-card sb-slip">
+        <h3>Cupón de apuesta</h3>
+        <p className="sb-muted">Toca una cuota para agregarla al cupón.</p>
+      </section>
     );
   }
 
@@ -224,43 +304,46 @@ function BetSlip({ pick, liveOdds, token, onPlaced, onClear, onAcceptOdds, onUna
   }
 
   return (
-    <form className="card slip" onSubmit={submit}>
-      <h2>
-        Boleta
-        <button type="button" className="link" onClick={onClear}>
-          Quitar
+    <form className="sb-card sb-slip" onSubmit={submit}>
+      <h3>
+        Cupón de apuesta
+        <button type="button" className="sb-link" onClick={onClear}>
+          Limpiar
         </button>
-      </h2>
-      <div className="pick">
-        <span className="muted">{pick.match}</span>
-        <strong>{pick.label}</strong>
-        <span className="pick-odds">{formatOdds(pick.odds)}</span>
+      </h3>
+      <div className="sb-pick">
+        <div>
+          <span className="sb-muted">{pick.match}</span>
+          <strong>{pick.label}</strong>
+          <span className="sb-muted">Resultado del partido · {PICK_LABEL[pick.code]}</span>
+        </div>
+        <span className="sb-pick-odds">{formatOdds(pick.odds)}</span>
       </div>
       {moved && (
-        <p className="alert info">
+        <p className="sb-alert">
           La cuota ahora es {formatOdds(liveOdds!)}.{' '}
-          <button type="button" className="link" onClick={() => onAcceptOdds(liveOdds!)}>
-            Aceptar
+          <button type="button" className="sb-link" onClick={() => onAcceptOdds(liveOdds!)}>
+            Aceptar cambio
           </button>
         </p>
       )}
-      <label>
-        Valor de la apuesta (COP)
+      <label className="sb-stake">
+        Valor de la apuesta
         <input type="number" inputMode="numeric" min={1000} step={1} value={stake} onChange={(e) => setStake(e.target.value)} required />
       </label>
-      <div className="chips">
+      <div className="sb-chips">
         {QUICK_STAKES.map((value) => (
-          <button key={value} type="button" className={amount === value ? 'chip active' : 'chip'} onClick={() => setStake(String(value))}>
+          <button key={value} type="button" className={amount === value ? 'active' : ''} onClick={() => setStake(String(value))}>
             {formatCop(value)}
           </button>
         ))}
       </div>
-      <div className="payout">
-        <span>Pago posible</span>
+      <div className="sb-payout">
+        <span>Ganancia posible</span>
         <strong>{formatCop(Math.floor((amount * Math.round(pick.odds * 100)) / 100))}</strong>
       </div>
-      {result && <p className={`alert ${result.kind}`}>{result.text}</p>}
-      <button type="submit" disabled={busy || amount <= 0}>
+      {result && <p className={`sb-result ${result.kind}`}>{result.text}</p>}
+      <button type="submit" className="sb-submit" disabled={busy || amount <= 0}>
         {busy ? 'Registrando…' : `Apostar ${amount ? formatCop(amount) : ''}`}
       </button>
     </form>

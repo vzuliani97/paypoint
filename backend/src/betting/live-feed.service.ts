@@ -12,9 +12,14 @@ const FIXTURES: Array<[string, string, string]> = [
   ['Liga Demo Colombia', 'Juventud Llanera', 'Sporting Altiplano'],
   ['Copa Demo Sudamericana', 'Estrella del Sur', 'Racing Montaña'],
   ['Liga Demo Colombia', 'Corsarios del Golfo', 'Halcones de la Sierra'],
+  ['Copa Demo Sudamericana', 'Cóndores del Norte', 'Deportivo Valle Verde'],
+  ['Liga Demo Colombia', 'Atlético Bahía', 'Unión Cafetera'],
 ];
+const BOARD_SIZE = 6; // matches that are live or about to start
 const MARGIN = 1.06; // bookmaker margin over fair probabilities
-const MINUTES_PER_TICK = 3;
+const MINUTES_PER_TICK = 1; // a 90-minute match lasts 90 ticks (4.5 min at the default 3 s interval)
+// Goals per minute, about 1.4 for the home side and 1.1 for the away side over 90 minutes, like real football.
+const GOAL_RATE = { home: 0.0155, away: 0.0122 };
 const FEED_LOCK = 'betting-live-feed';
 
 /**
@@ -88,8 +93,8 @@ export class LiveFeedService implements OnModuleInit, OnModuleDestroy {
       const done: number[] = [];
       for (const event of live.rows) {
         const minute = Math.min(90, event.minute + MINUTES_PER_TICK);
-        const home = event.home_score + (random() < 0.07 ? 1 : 0);
-        const away = event.away_score + (random() < 0.055 ? 1 : 0);
+        const home = event.home_score + (random() < GOAL_RATE.home * MINUTES_PER_TICK ? 1 : 0);
+        const away = event.away_score + (random() < GOAL_RATE.away * MINUTES_PER_TICK ? 1 : 0);
         const over = minute >= 90;
         await client.query(
           `UPDATE sports_events SET minute = $2, home_score = $3, away_score = $4,
@@ -122,16 +127,16 @@ export class LiveFeedService implements OnModuleInit, OnModuleDestroy {
     return finished;
   }
 
-  /** Keeps four matches that are live or about to start, staggered a few minutes apart. */
+  /** Keeps BOARD_SIZE matches that are live or about to start, staggered a few seconds apart. */
   private async keepBoardFull(client: PoolClient) {
     const { rows } = await client.query<{ open: number }>("SELECT count(*)::int AS open FROM sports_events WHERE status <> 'FINISHED'");
-    for (let i = rows[0].open; i < 4; i += 1) {
+    for (let i = rows[0].open; i < BOARD_SIZE; i += 1) {
       const [league, home, away] = FIXTURES[this.fixtureIndex % FIXTURES.length];
       this.fixtureIndex += 1;
       const event = await client.query<{ id: number }>(
         `INSERT INTO sports_events (sport, league, home, away, starts_at)
          VALUES ('FUTBOL', $1, $2, $3, now() + make_interval(secs => $4)) RETURNING id`,
-        [league, home, away, i * 45],
+        [league, home, away, i * 15],
       );
       const probabilities = matchProbabilities(0, 1);
       await client.query(

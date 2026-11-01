@@ -136,7 +136,7 @@ describe('Live betting and casino', () => {
   });
 
   it('live feed: a tick moves the clock and the prices, and a match that reaches 90 minutes is settled', async () => {
-    const ending = await createEvent('LIVE', 87, [1, 0]);
+    const ending = await createEvent('LIVE', 89, [1, 0]);
     const running = await createEvent('LIVE', 30, [0, 0]);
     await bet(ending.home, 10_000, 2).expect(201);
     const feed = ctx.app.get(LiveFeedService);
@@ -149,14 +149,14 @@ describe('Live betting and casino', () => {
     ]);
     expect(events.rows).toEqual([
       { id: ending.eventId, status: 'FINISHED', minute: 90 },
-      { id: running.eventId, status: 'LIVE', minute: 33 },
+      { id: running.eventId, status: 'LIVE', minute: 31 },
     ]);
     const odds = await ctx.pool.query<{ odds_x100: number }>('SELECT odds_x100 FROM selections WHERE id = $1', [running.draw]);
     expect(odds.rows[0].odds_x100).not.toBe(320); // a level match moves toward the draw
     expect(await balanceOf(ctx.pool, posId)).toBe(60_000);
-    // The feed refilled the board to four open matches before this tick finished one of them.
+    // The feed refilled the board to six open matches before this tick finished one of them.
     const open = await ctx.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM sports_events WHERE status <> 'FINISHED'");
-    expect(open.rows[0].n).toBe(3);
+    expect(open.rows[0].n).toBe(5);
   });
 
   it('streams the live board as server-sent events', async () => {
