@@ -37,4 +37,4 @@ Unchanged. All locks and invariants live in PostgreSQL and the API is stateless.
 Reconciliation of `PENDING` sales, idempotent admin credits, secrets in KMS, rate limiting on login, and an outbox for events.
 
 **10. Did you use AI tools?**
-I used Claude Code to accelerate implementation. I defined the requirements and constraints, ran the system, evaluated the results and accepted only behavior verified through reproducible tests and CI. I can explain the decisions I have personally reviewed.
+I used AI coding tools to accelerate implementation. I defined the requirements and constraints, ran the system, evaluated the results and accepted only behavior verified through reproducible tests and CI. I can explain the decisions I have personally reviewed.
