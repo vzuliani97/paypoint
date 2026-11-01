@@ -725,7 +725,7 @@ th.num {
 .sb-cols,
 .sb-odds {
   display: grid;
-  grid-template-columns: repeat(3, 68px);
+  grid-template-columns: repeat(3, 68px) 40px;
   gap: 0.4rem;
   text-align: center;
 }
@@ -1126,3 +1126,546 @@ th.num {
   color: var(--ok);
 }
 
+
+/* ---------- Sportsbook: event page with every market ---------- */
+
+button.sb-teams {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  box-shadow: none;
+  font: inherit;
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.sb-teams:hover span {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.sb-more {
+  min-height: 42px;
+  padding: 0;
+  border: 1px dashed var(--sb-line);
+  border-radius: 9px;
+  background: none;
+  color: var(--sb-muted);
+  box-shadow: none;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.sb-more:hover {
+  border-color: var(--sb-accent);
+  color: var(--sb-ink);
+}
+
+.sb-detail {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.sb-back {
+  justify-self: start;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: var(--sb-surface);
+  color: var(--sb-muted);
+  box-shadow: none;
+  font-size: 0.82rem;
+}
+
+.sb-scoreboard {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.2rem 1.3rem;
+  border: 1px solid var(--sb-line);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 15% 0%, rgb(59 106 214 / 35%), transparent 55%),
+    radial-gradient(circle at 85% 100%, rgb(34 197 94 / 18%), transparent 50%),
+    var(--sb-surface);
+}
+
+.sb-detail-league {
+  color: var(--sb-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sb-score-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: 'home score away';
+  align-items: center;
+  gap: 1rem;
+}
+
+.sb-team {
+  grid-area: home;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.sb-team.away {
+  grid-area: away;
+}
+
+.sb-crest {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 25%);
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  box-shadow: 0 10px 24px -10px rgb(0 0 0 / 60%);
+}
+
+.sb-big-score {
+  grid-area: score;
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  font-size: 2.4rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.sb-state {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--sb-surface-2);
+  color: var(--sb-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.sb-state.live {
+  background: rgb(244 63 94 / 18%);
+  color: #ff8fa3;
+}
+
+.sb-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sb-surface-2);
+  overflow: hidden;
+}
+
+.sb-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e, #3b6ad6);
+  transition: width 1s linear;
+}
+
+.sb-market {
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid var(--sb-line);
+  border-radius: 14px;
+  background: var(--sb-surface);
+}
+
+.sb-market h4 {
+  margin: 0 0 0.7rem;
+  color: var(--sb-ink);
+  font-size: 0.9rem;
+}
+
+.sb-market-odds {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sb-market-odds.n2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sb-market-odds.n3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sb-odd.wide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+}
+
+.sb-odd.wide span:first-child {
+  overflow: hidden;
+  color: var(--sb-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-odd.wide strong {
+  position: relative;
+  font-size: 1rem;
+}
+
+@media (max-width: 640px) {
+  .sb-market-odds.n3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Casino: lobby, slot machine and table games ---------- */
+
+.casino {
+  --cs-bg: #120a1f;
+  --cs-surface: #1c1130;
+  --cs-surface-2: #261842;
+  --cs-line: #36265a;
+  --cs-ink: #f4ecff;
+  --cs-muted: #b3a3d6;
+  --cs-gold: #f5c451;
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 10% 0%, rgb(168 85 247 / 30%), transparent 45%),
+    radial-gradient(circle at 90% 100%, rgb(245 196 81 / 18%), transparent 45%),
+    var(--cs-bg);
+  color: var(--cs-ink);
+}
+
+.cs-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.3rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 16px;
+  background: linear-gradient(120deg, #2a1650, #1c1130 60%, #3a2a10);
+}
+
+.cs-hero h2 {
+  margin: 0.2rem 0;
+  color: #fff;
+}
+
+.cs-hero p {
+  margin: 0;
+  color: var(--cs-muted);
+  font-size: 0.88rem;
+}
+
+.cs-tag {
+  color: var(--cs-gold);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cs-hero-glyph {
+  font-size: 3.2rem;
+}
+
+.cs-chips {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.cs-chips button {
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  background: var(--cs-surface);
+  color: var(--cs-muted);
+  box-shadow: none;
+  font-size: 0.85rem;
+}
+
+.cs-chips button[aria-selected='true'] {
+  background: var(--cs-gold);
+  color: #2a1a00;
+}
+
+.cs-lobby {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 0.7rem;
+}
+
+.cs-tile {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
+  min-height: 150px;
+  padding: 0.9rem;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  color: #fff;
+  box-shadow: 0 14px 30px -18px rgb(0 0 0 / 80%);
+  text-align: left;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.cs-tile:hover {
+  transform: translateY(-3px);
+  filter: none;
+}
+
+.cs-tile.active {
+  border-color: var(--cs-gold);
+}
+
+.cs-tile.ruleta_andina { background: linear-gradient(145deg, #b91c1c, #450a0a); }
+.cs-tile.blackjack_pacifico { background: linear-gradient(145deg, #166534, #052e16); }
+.cs-tile.tragamonedas_cafe { background: linear-gradient(145deg, #92400e, #3b1d06); }
+.cs-tile.esmeraldas_del_rio { background: linear-gradient(145deg, #047857, #022c22); }
+.cs-tile.frutas_tropicales { background: linear-gradient(145deg, #c026d3, #4a044e); }
+
+.cs-tile-glyph {
+  margin-bottom: auto;
+  font-size: 2.4rem;
+}
+
+.cs-tile small {
+  color: rgb(255 255 255 / 75%);
+}
+
+.cs-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 860px) {
+  .cs-stage {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cs-machine,
+.cs-controls {
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+  padding: 1.1rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 18px;
+  background: var(--cs-surface);
+}
+
+.cs-machine {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(245 196 81 / 18%), transparent 60%),
+    var(--cs-surface);
+}
+
+.cs-machine-head {
+  display: flex;
+  justify-content: space-between;
+  color: var(--cs-muted);
+  font-size: 0.85rem;
+}
+
+.cs-machine-head strong {
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.cs-reels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  padding: 0.8rem;
+  border: 3px solid var(--cs-gold);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #0c0616, #1b0f2e 50%, #0c0616);
+  box-shadow: inset 0 0 30px rgb(0 0 0 / 70%), 0 0 0 6px rgb(245 196 81 / 12%);
+}
+
+.cs-reels.win {
+  box-shadow: inset 0 0 30px rgb(0 0 0 / 70%), 0 0 30px 4px rgb(245 196 81 / 55%);
+}
+
+.cs-reel {
+  display: grid;
+  grid-template-rows: repeat(3, 72px);
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8f4ff, #ffffff 50%, #ece4ff);
+}
+
+.cs-reel.spinning {
+  grid-template-rows: none;
+  grid-auto-rows: 72px;
+  height: 216px;
+}
+
+.cs-reel.spinning .cs-symbol {
+  animation: reel-spin 0.35s linear infinite;
+  filter: blur(1.5px);
+}
+
+@keyframes reel-spin {
+  from {
+    transform: translateY(-216px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.cs-symbol {
+  display: grid;
+  place-items: center;
+  font-size: 2.6rem;
+  line-height: 1;
+}
+
+.cs-symbol.line {
+  background: rgb(245 196 81 / 22%);
+  box-shadow: inset 0 2px 0 rgb(245 196 81 / 70%), inset 0 -2px 0 rgb(245 196 81 / 70%);
+}
+
+.cs-table {
+  display: grid;
+  place-items: center;
+  height: 240px;
+  border: 3px solid var(--cs-gold);
+  border-radius: 18px;
+  background: radial-gradient(circle, #14532d, #052e16 70%);
+  font-size: 6rem;
+}
+
+.cs-table.spinning span {
+  animation: table-spin 0.6s linear infinite;
+}
+
+@keyframes table-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cs-result {
+  padding: 0.7rem;
+  border-radius: 12px;
+  background: var(--cs-surface-2);
+  color: var(--cs-gold);
+  font-size: 1.15rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.cs-controls label {
+  color: var(--cs-muted);
+}
+
+.cs-controls input {
+  border-color: var(--cs-line);
+  background: var(--cs-bg);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.cs-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cs-quick button {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 999px;
+  background: var(--cs-surface-2);
+  color: var(--cs-ink);
+  box-shadow: none;
+  font-size: 0.82rem;
+}
+
+.cs-quick button.active {
+  border-color: var(--cs-gold);
+  color: var(--cs-gold);
+}
+
+.cs-spin {
+  min-height: 52px;
+  background: linear-gradient(135deg, #f5c451, #d97706);
+  color: #2a1a00;
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.cs-controls h3 {
+  margin: 0.4rem 0 0;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.cs-muted {
+  margin: 0;
+  color: var(--cs-muted);
+  font-size: 0.85rem;
+}
+
+.cs-history {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cs-history li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.45rem 0.6rem;
+  border-radius: 9px;
+  background: var(--cs-surface-2);
+  font-size: 0.85rem;
+}
+
+.cs-history .won {
+  color: #86efac;
+  font-weight: 800;
+}
+
+.cs-history .back {
+  color: var(--cs-gold);
+  font-weight: 800;
+}
+
+.cs-history .lost {
+  color: #fda4af;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-reel.spinning .cs-symbol,
+  .cs-table.spinning span {
+    animation: none;
+  }
+}
+
+.sb-odd.wide .sb-arrow {
+  position: static;
+  margin-left: 0.3rem;
+  font-size: 0.7rem;
+}

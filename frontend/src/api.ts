@@ -54,12 +54,16 @@ export interface BoardEvent {
   status: 'SCHEDULED' | 'LIVE' | 'FINISHED';
   minute: number;
   score: [number, number];
-  selections: Array<{ id: number; code: 'HOME' | 'DRAW' | 'AWAY'; odds: number; suspended: boolean }>;
+  selections: Array<{ id: number; market: Market; code: PickCode; odds: number; suspended: boolean }>;
 }
+
+export type Market = 'MATCH' | 'DOUBLE' | 'GOALS' | 'BTTS';
+export type PickCode = 'HOME' | 'DRAW' | 'AWAY' | '1X' | '12' | 'X2' | 'OVER' | 'UNDER' | 'YES' | 'NO';
 
 export interface Bet {
   id: string;
-  pick: 'HOME' | 'DRAW' | 'AWAY';
+  market: Market;
+  pick: PickCode;
   match: string;
   league: string;
   stake: number;
@@ -75,6 +79,7 @@ export interface CasinoGame {
   kind: string;
   minStake: number;
   maxStake: number;
+  topMultiplier: number;
 }
 
 export interface RoundResult {

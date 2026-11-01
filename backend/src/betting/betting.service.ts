@@ -5,7 +5,8 @@ import { AppError } from '../common/app-error';
 import { APP_CONFIG, AppConfig } from '../config';
 import { DatabaseService } from '../database/database.service';
 
-export type SelectionCode = 'HOME' | 'DRAW' | 'AWAY';
+export type SelectionCode = 'HOME' | 'DRAW' | 'AWAY' | '1X' | '12' | 'X2' | 'OVER' | 'UNDER' | 'YES' | 'NO';
+export type MarketCode = 'MATCH' | 'DOUBLE' | 'GOALS' | 'BTTS';
 export type BetStatus = 'OPEN' | 'WON' | 'LOST' | 'VOID';
 
 export interface PlaceBetCommand {
@@ -30,6 +31,7 @@ interface BoardRow {
   away_score: number;
   version: number;
   selection_id: number;
+  market: MarketCode;
   code: SelectionCode;
   odds_x100: number;
   suspended: boolean;
@@ -46,6 +48,7 @@ interface BetRow {
   request_hash: string;
   created_at: Date;
   settled_at: Date | null;
+  market: MarketCode;
   code: SelectionCode;
   home: string;
   away: string;
@@ -53,7 +56,7 @@ interface BetRow {
 }
 
 const SELECT_BET = `
-  SELECT b.*, s.code, e.home, e.away, e.league
+  SELECT b.*, s.market, s.code, e.home, e.away, e.league
   FROM bets b
   JOIN selections s ON s.id = b.selection_id
   JOIN sports_events e ON e.id = s.event_id
@@ -62,6 +65,7 @@ const SELECT_BET = `
 export const toBet = (row: BetRow) => ({
   id: row.id,
   selectionId: row.selection_id,
+  market: row.market,
   pick: row.code,
   match: `${row.home} vs ${row.away}`,
   league: row.league,
@@ -80,6 +84,18 @@ export const payoutFor = (stake: number, oddsX100: number) => Math.floor((stake 
 
 export const winningCode = (home: number, away: number): SelectionCode => (home > away ? 'HOME' : home < away ? 'AWAY' : 'DRAW');
 
+/** Every winning selection of a final score, as MARKET:CODE. */
+export function winningSelections(home: number, away: number): string[] {
+  const result = winningCode(home, away);
+  const doubles = { HOME: ['1X', '12'], DRAW: ['1X', 'X2'], AWAY: ['12', 'X2'] }[result as 'HOME' | 'DRAW' | 'AWAY'];
+  return [
+    `MATCH:${result}`,
+    ...doubles.map((code) => `DOUBLE:${code}`),
+    `GOALS:${home + away > 2 ? 'OVER' : 'UNDER'}`,
+    `BTTS:${home > 0 && away > 0 ? 'YES' : 'NO'}`,
+  ];
+}
+
 @Injectable()
 export class BettingService {
   constructor(
@@ -87,15 +103,16 @@ export class BettingService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  /** Upcoming and live matches, plus the last finished ones, with their 1X2 odds. */
+  /** Upcoming and live matches, plus the last finished ones, with the odds of every market. */
   async board() {
     const { rows } = await this.db.query<BoardRow>(
       `SELECT e.id AS event_id, e.sport, e.league, e.home, e.away, e.starts_at, e.status, e.minute,
-              e.home_score, e.away_score, e.version, s.id AS selection_id, s.code, s.odds_x100, s.suspended
+              e.home_score, e.away_score, e.version, s.id AS selection_id, s.market, s.code, s.odds_x100, s.suspended
        FROM sports_events e JOIN selections s ON s.event_id = e.id
        WHERE e.status <> 'FINISHED' OR e.updated_at > now() - interval '10 minutes'
        ORDER BY CASE e.status WHEN 'LIVE' THEN 0 WHEN 'SCHEDULED' THEN 1 ELSE 2 END, e.starts_at, e.id,
-                array_position(ARRAY['HOME', 'DRAW', 'AWAY'], s.code::text)`,
+                array_position(ARRAY['MATCH', 'DOUBLE', 'GOALS', 'BTTS'], s.market::text),
+                array_position(ARRAY['HOME', 'DRAW', 'AWAY', '1X', '12', 'X2', 'OVER', 'UNDER', 'YES', 'NO'], s.code::text)`,
     );
     const eventView = (row: BoardRow) => ({
       id: row.event_id,
@@ -108,13 +125,14 @@ export class BettingService {
       minute: row.minute,
       score: [row.home_score, row.away_score] as [number, number],
       version: row.version,
-      selections: [] as Array<{ id: number; code: SelectionCode; odds: number; suspended: boolean }>,
+      selections: [] as Array<{ id: number; market: MarketCode; code: SelectionCode; odds: number; suspended: boolean }>,
     });
     const events = new Map<number, ReturnType<typeof eventView>>();
     for (const row of rows) {
       if (!events.has(row.event_id)) events.set(row.event_id, eventView(row));
       events.get(row.event_id)!.selections.push({
         id: row.selection_id,
+        market: row.market,
         code: row.code,
         odds: row.odds_x100 / 100,
         suspended: row.suspended || row.status === 'FINISHED',
@@ -227,11 +245,11 @@ export class BettingService {
 
       const settled = await client.query<{ id: string; pos_id: string; potential_payout: number; status: BetStatus }>(
         `UPDATE bets b
-         SET status = CASE WHEN s.code = $2 THEN 'WON' ELSE 'LOST' END, settled_at = now()
+         SET status = CASE WHEN s.market || ':' || s.code = ANY($2::text[]) THEN 'WON' ELSE 'LOST' END, settled_at = now()
          FROM selections s
          WHERE b.selection_id = s.id AND s.event_id = $1 AND b.status = 'OPEN'
          RETURNING b.id, b.pos_id, b.potential_payout, b.status`,
-        [eventId, winningCode(home, away)],
+        [eventId, winningSelections(home, away)],
       );
 
       // Credit winners in a fixed order of stores, so two settlements never deadlock on balances.

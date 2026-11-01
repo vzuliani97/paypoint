@@ -45,6 +45,43 @@ export function matchProbabilities(diff: number, remaining: number): [number, nu
   return diff > 0 ? [leader, draw, comeback] : [comeback, draw, leader];
 }
 
+const poissonAtLeast = (goals: number, mean: number) => {
+  let below = 0;
+  for (let k = 0, term = Math.exp(-mean); k < goals; k += 1, term *= mean / k) below += term;
+  return 1 - below;
+};
+
+export type Market = 'MATCH' | 'DOUBLE' | 'GOALS' | 'BTTS';
+
+/**
+ * Fair probabilities for every market of a match. The match result uses matchProbabilities; total goals
+ * and both-teams-to-score use the same goal rates as the simulation (Poisson over the minutes left);
+ * double chance adds up the match-result outcomes.
+ */
+export function marketProbabilities(home: number, away: number, minute: number): Array<[Market, string, number]> {
+  const [win, draw, loss] = matchProbabilities(home - away, (90 - minute) / 90);
+  const left = 90 - minute;
+  const over = poissonAtLeast(Math.max(0, 3 - home - away), (GOAL_RATE.home + GOAL_RATE.away) * left);
+  const homeScores = home > 0 ? 1 : 1 - Math.exp(-GOAL_RATE.home * left);
+  const awayScores = away > 0 ? 1 : 1 - Math.exp(-GOAL_RATE.away * left);
+  const both = homeScores * awayScores;
+  return [
+    ['MATCH', 'HOME', win],
+    ['MATCH', 'DRAW', draw],
+    ['MATCH', 'AWAY', loss],
+    ['DOUBLE', '1X', win + draw],
+    ['DOUBLE', '12', win + loss],
+    ['DOUBLE', 'X2', draw + loss],
+    ['GOALS', 'OVER', over],
+    ['GOALS', 'UNDER', 1 - over],
+    ['BTTS', 'YES', both],
+    ['BTTS', 'NO', 1 - both],
+  ];
+}
+
+/** A goals market is decided once the score makes one outcome certain; it is suspended, not priced at 1.00. */
+const decided = (market: Market, probability: number) => market !== 'MATCH' && market !== 'DOUBLE' && (probability < 0.005 || probability > 0.995);
+
 export function oddsFromProbability(probability: number): number {
   return Math.min(5000, Math.max(101, Math.round(100 / (probability * MARGIN))));
 }
@@ -107,13 +144,14 @@ export class LiveFeedService implements OnModuleInit, OnModuleDestroy {
           done.push(event.id);
           continue;
         }
-        const probabilities = matchProbabilities(home - away, (90 - minute) / 90);
-        for (const [index, code] of (['HOME', 'DRAW', 'AWAY'] as const).entries()) {
+        for (const [market, code, probability] of marketProbabilities(home, away, minute)) {
           const jitter = 1 + (random() - 0.5) * 0.04;
-          await client.query('UPDATE selections SET odds_x100 = $3 WHERE event_id = $1 AND code = $2', [
+          await client.query('UPDATE selections SET odds_x100 = $4, suspended = $5 WHERE event_id = $1 AND market = $2 AND code = $3', [
             event.id,
+            market,
             code,
-            oddsFromProbability(probabilities[index] * jitter),
+            oddsFromProbability(probability * jitter),
+            decided(market, probability),
           ]);
         }
       }
@@ -138,11 +176,14 @@ export class LiveFeedService implements OnModuleInit, OnModuleDestroy {
          VALUES ('FUTBOL', $1, $2, $3, now() + make_interval(secs => $4)) RETURNING id`,
         [league, home, away, i * 15],
       );
-      const probabilities = matchProbabilities(0, 1);
-      await client.query(
-        `INSERT INTO selections (event_id, code, odds_x100) VALUES ($1, 'HOME', $2), ($1, 'DRAW', $3), ($1, 'AWAY', $4)`,
-        [event.rows[0].id, ...probabilities.map(oddsFromProbability)],
-      );
+      for (const [market, code, probability] of marketProbabilities(0, 0, 0)) {
+        await client.query('INSERT INTO selections (event_id, market, code, odds_x100) VALUES ($1, $2, $3, $4)', [
+          event.rows[0].id,
+          market,
+          code,
+          oddsFromProbability(probability),
+        ]);
+      }
     }
   }
 }

@@ -30,6 +30,8 @@ export interface WalletResult {
 export const GAMES = [
   { code: 'RULETA_ANDINA', name: 'Ruleta Andina', kind: 'Ruleta', minStake: 1000, maxStake: 200000, table: [[18, 2], [19, 0]] },
   { code: 'TRAGAMONEDAS_CAFE', name: 'Tragamonedas del Café', kind: 'Tragamonedas', minStake: 500, maxStake: 50000, table: [[2, 20], [6, 5], [12, 2], [20, 1], [60, 0]] },
+  { code: 'ESMERALDAS_DEL_RIO', name: 'Esmeraldas del Río', kind: 'Tragamonedas', minStake: 500, maxStake: 50000, table: [[1, 50], [4, 10], [10, 3], [20, 1], [65, 0]] },
+  { code: 'FRUTAS_TROPICALES', name: 'Frutas Tropicales', kind: 'Tragamonedas', minStake: 200, maxStake: 20000, table: [[3, 10], [10, 4], [15, 2], [22, 1], [50, 0]] },
   { code: 'BLACKJACK_PACIFICO', name: 'Blackjack Pacífico', kind: 'Blackjack', minStake: 2000, maxStake: 300000, table: [[44, 2], [8, 1], [48, 0]] },
 ] as const;
 
@@ -56,7 +58,8 @@ export class CasinoService {
   constructor(private readonly db: DatabaseService) {}
 
   games() {
-    return GAMES.map(({ table: _table, ...game }) => game);
+    // The outcome table stays with the provider; the lobby only needs the top prize.
+    return GAMES.map(({ table, ...game }) => ({ ...game, topMultiplier: Math.max(...table.map(([, multiplier]) => multiplier)) }));
   }
 
   debit(op: WalletOperation): Promise<WalletResult> {

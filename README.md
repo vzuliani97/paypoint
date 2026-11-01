@@ -1,17 +1,21 @@
-# AtomicTrail — Transaction Reliability Lab
+# NekoBet — Live Sportsbook, Casino & Wallet Platform
 
-*Formerly the PayPoint repository.*
+*Formerly AtomicTrail, and before that the PayPoint repository.*
 
-[![CI](https://github.com/vzuliani97/atomictrail/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/atomictrail/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/vzuliani97/atomictrail/actions/workflows/codeql.yml/badge.svg)](https://github.com/vzuliani97/atomictrail/actions/workflows/codeql.yml)
+[![CI](https://github.com/vzuliani97/nekobet/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/nekobet/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/vzuliani97/nekobet/actions/workflows/codeql.yml/badge.svg)](https://github.com/vzuliani97/nekobet/actions/workflows/codeql.yml)
 
-A TypeScript and PostgreSQL system that keeps balances correct under concurrent requests, retries, provider timeouts and reversals. It demonstrates idempotency, an append-only ledger, HMAC-signed integrations and real-time events.
+A point-of-sale platform where every store sells live sports bets, casino games and prepaid top-ups from one balance: a sportsbook with live odds and several markets per match, a casino lobby with slot machines and table games, and a cashier for top-ups. Built in TypeScript and PostgreSQL as a transaction reliability lab: the balance stays correct under concurrent requests, retries, provider timeouts and reversals, with idempotency, an append-only ledger, HMAC-signed integrations and real-time events.
 
-A reliability lab for a transactional API: safe state transitions in PostgreSQL ("atomic") and an auditable record of every balance movement ("trail"). The sample service inside it is **PayPoint**, a prepaid top-up and payments platform for a network of points of sale. Each store holds a prepaid balance and sells mobile top-ups and gift cards, either from a web portal or from a partner's own system through a signed B2B API. The service's code, images and metrics keep the `paypoint` name.
+Matches, odds, games and the carrier are simulated, and all data is fictitious; NekoBet is a demonstration, not a licensed betting service. The service's code, images and metrics keep the `paypoint` name.
 
-The interesting part is not the CRUD. It is keeping money correct when requests race, retry or fail halfway.
+![Live sportsbook: matches by league with minute, score and moving 1X2 odds, a "+7" link to every market, the bet slip with an odds-change notice, and my bets](docs/screenshots/04-live-betting.png)
 
-![Cashier: store balance, top-up sales and a rejected sale refunded exactly once](docs/screenshots/02-cashier-sale.png)
+| Event page with every market | Casino lobby and slot machine |
+|---|---|
+| ![Event page: scoreboard, match result, double chance, total goals 2.5 and both teams to score](docs/screenshots/06-event-markets.png) | ![Casino: five fictitious games, a slot machine paying x2 through the wallet, and the last rounds](docs/screenshots/05-casino.png) |
+
+The interesting part is not the screens. It is keeping money correct when requests race, retry or fail halfway.
 
 ## What it is for
 
@@ -29,12 +33,12 @@ Everything in this repository, end to end:
 
 - **Data model:** balances guarded by `CHECK (balance >= 0)`, an append-only ledger, sales, bets, settlements and casino wallet transactions, in plain versioned SQL.
 - **API (NestJS):** idempotent sales with a per-key advisory lock and request hash, the provider call outside the transaction, refunds at most once, an HMAC-SHA256 partner API with an IP allowlist, JWT roles and Zod validation.
-- **Live betting:** a simulated odds feed with a single leader (`pg_try_advisory_xact_lock`), Server-Sent Events to the browser, `ODDS_CHANGED` when the price moved, settlement paid exactly once.
-- **Casino:** a seamless wallet whose provider callbacks are idempotent by transaction id, with rollback tombstones.
-- **Frontend (React):** the cashier with top-ups, the sportsbook (leagues, live minute and score, 1X2 odds, bet slip, my bets) and the casino; the admin screens.
-- **Delivery and quality:** Docker Compose, Prometheus metrics, multi-arch images published by CI and deployed by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit), 49 automated tests, CodeQL, Gitleaks and `npm audit`.
+- **Live betting:** a simulated odds feed with a single leader (`pg_try_advisory_xact_lock`) that prices four markets per match from one goal model (match result, double chance, total goals 2.5, both teams to score), Server-Sent Events to the browser, `ODDS_CHANGED` when the price moved, and settlement of every market paid exactly once.
+- **Casino:** a seamless wallet whose provider callbacks are idempotent by transaction id, with rollback tombstones; five fictitious games, three of them slot machines whose reels show the outcome the provider decided.
+- **Frontend (React):** the cashier with top-ups; the sportsbook with leagues, live minute and score, an event page with every market, bet slip and my bets; the casino lobby with an animated slot machine; the admin screens.
+- **Delivery and quality:** Docker Compose, Prometheus metrics, multi-arch images published by CI and deployed by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit), 52 automated tests, CodeQL, Gitleaks and `npm audit`.
 
-| Problem | How PayPoint handles it | Proof |
+| Problem | How NekoBet handles it | Proof |
 |---|---|---|
 | Two sales spend the same balance at once | Check and debit in one conditional `UPDATE`, plus `CHECK (balance >= 0)` | 70 concurrent sales against room for 50 approve exactly 50 ([local experiment](docs/concurrency-experiment.md), not a production benchmark) |
 | A network retry charges twice | Mandatory `Idempotency-Key`, `UNIQUE (pos_id, key)`, a per-key advisory lock and a request hash | 70 concurrent retries create 1 sale; same key with a different body returns 409 |
@@ -58,7 +62,7 @@ Everything in this repository, end to end:
 
 ![Cashier: balance, products and sales with a refunded rejection](docs/screenshots/02-cashier-sale.png)
 
-### 2. Place a live bet (simulated scenario)
+### 2. Place a live bet
 
 ```mermaid
 sequenceDiagram
@@ -78,19 +82,20 @@ sequenceDiagram
   F->>DB: final whistle, settle every bet, payout exactly once
 ```
 
-1. The board shows live matches by league with minute, score and 1X2 odds that move up or down.
+1. The board shows live matches by league with minute, score and 1X2 odds that move up or down; "+7" opens the event page with every market: match result, double chance, total goals 2.5 and both teams to score. Goals markets are priced with a Poisson model over the minutes left and suspended once the score decides them.
 2. A tap on a price fills the bet slip; the bet carries the odds the cashier saw. If the price moved, the API refuses with `ODDS_CHANGED` and the slip offers the new one.
-3. At the final whistle every bet is settled; a unique index guarantees one payout per bet.
+3. At the final whistle every market is settled from the final score; a unique index guarantees one payout per bet.
 
-![Sportsbook: live matches, moving odds, bet slip and my bets](docs/screenshots/04-live-betting.png)
+![Event page: scoreboard, match result, double chance, total goals 2.5 and both teams to score, with the bet slip](docs/screenshots/06-event-markets.png)
 
-### 3. Play the casino (simulated scenario, seamless wallet)
+### 3. Play the casino (seamless wallet)
 
 1. The game provider calls the wallet to debit a bet, credit a win or roll back, signing each callback with HMAC.
 2. Every callback is idempotent by the provider's transaction id: a retry gets the same answer and moves no money twice.
 3. A rollback that arrives before its debit leaves a tombstone, so the late debit is refused.
+4. The lobby has five fictitious games. In a slot machine the reels spin and stop one by one on the outcome the provider already decided and paid through the wallet.
 
-![Casino wallet and the ledger with bets and payouts](docs/screenshots/05-casino.png)
+![Casino lobby and slot machine with a win, and the last rounds](docs/screenshots/05-casino.png)
 
 ### 4. Partner API (B2B)
 
@@ -107,21 +112,8 @@ The admin creates points of sale, credits their balances and watches sales acros
 - **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations), Zod, JWT, bcrypt, Helmet, Prometheus metrics
 - **Frontend:** React 19 + TypeScript (Vite), served by unprivileged nginx
 - **Real time:** Server-Sent Events for the live odds board, a simulated odds feed with one leader across replicas (PostgreSQL advisory lock)
-- **Quality:** Jest + Supertest, 49 tests (10 unit, 39 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
+- **Quality:** Jest + Supertest, 52 tests (12 unit, 40 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
 - **Delivery:** multi-stage Docker images running as non-root, Docker Compose, GitHub Actions publishing to GHCR. Deployed to Kubernetes in [OpsCircuit](https://github.com/vzuliani97/opscircuit).
-
-## Simulated scenarios: live betting and casino
-
-These are stress scenarios for the same guarantees, not the identity of the project. The same prepaid balance funds top-ups, live sports bets and casino rounds. Every stake, payout and wallet operation is a ledger movement, so the balance stays explainable.
-
-![Live betting: sports and leagues menu, matches grouped by league with minute, score and 1X2 odds that move in real time, the bet slip and my bets](docs/screenshots/04-live-betting.png)
-
-- **Live board:** a simulated odds feed starts matches, moves the clock, scores goals and reprices the 1X2 market from the score and the time left. The browser receives it over Server-Sent Events. With several API replicas, each tick takes a PostgreSQL advisory lock, so only one replica moves the board.
-- **Bets:** a mandatory `Idempotency-Key`, a check of the odds the cashier saw against the current price, and an atomic debit. Stake limits are configurable.
-- **Settlement:** when a match ends, winners are paid in one transaction; running it again changes nothing.
-- **Casino:** a seamless wallet the game provider calls with HMAC-signed `debit`, `credit` and `rollback` requests, idempotent by its transaction id. The cashier plays rounds through a simulated provider whose outcome is derived from the round id, so a retried round replays instead of playing again.
-
-![Casino: fictitious games, a round played through the wallet, and the ledger with bets, payouts and casino movements](docs/screenshots/05-casino.png)
 
 ## Architecture
 

@@ -29,8 +29,8 @@ export function LoginPage({ onSignIn }: { onSignIn: (session: Session) => void }
   return (
     <div className="login">
       <form className="card" onSubmit={submit}>
-        <h1>PayPoint</h1>
-        <p className="muted">Recargas y pagos para puntos de venta</p>
+        <h1>NekoBet</h1>
+        <p className="muted">Apuestas en vivo, casino y recargas para puntos de venta</p>
         <label>
           Correo
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />

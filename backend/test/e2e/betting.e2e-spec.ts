@@ -135,6 +135,29 @@ describe('Live betting and casino', () => {
     expect(await ledgerSum(ctx.pool, posId)).toBe(55_000);
   });
 
+  it('settles the goals and both-teams-to-score markets from the final score', async () => {
+    const betting = ctx.app.get(BettingService);
+    const event = await createEvent();
+    const extra = await ctx.pool.query<{ id: number; code: string }>(
+      `INSERT INTO selections (event_id, market, code, odds_x100) VALUES ($1, 'GOALS', 'OVER', 210), ($1, 'GOALS', 'UNDER', 180), ($1, 'BTTS', 'YES', 190)
+       RETURNING id, code`,
+      [event.eventId],
+    );
+    const id = (code: string) => extra.rows.find((row) => row.code === code)!.id;
+    await bet(id('OVER'), 10_000, 2.1).expect(201);
+    await bet(id('UNDER'), 10_000, 1.8).expect(201);
+    await bet(id('YES'), 10_000, 1.9).expect(201);
+
+    await ctx.pool.query("UPDATE sports_events SET status = 'FINISHED', minute = 90, home_score = 2, away_score = 1 WHERE id = $1", [event.eventId]);
+    expect(await betting.settleEvent(event.eventId)).toEqual({ won: 2, lost: 1 });
+
+    const bets = await ctx.http().get('/api/betting/bets').set('Authorization', `Bearer ${token}`).expect(200);
+    const statusOf = (pick: string) => bets.body.find((row: { pick: string }) => row.pick === pick).status;
+    expect([statusOf('OVER'), statusOf('UNDER'), statusOf('YES')]).toEqual(['WON', 'LOST', 'WON']);
+    // 50,000 - 3 stakes + 21,000 (over) + 19,000 (both teams scored)
+    expect(await balanceOf(ctx.pool, posId)).toBe(50_000 - 30_000 + 21_000 + 19_000);
+  });
+
   it('live feed: a tick moves the clock and the prices, and a match that reaches 90 minutes is settled', async () => {
     const ending = await createEvent('LIVE', 89, [1, 0]);
     const running = await createEvent('LIVE', 30, [0, 0]);

@@ -43,9 +43,9 @@ export function App() {
       <header className="topbar">
         <span className="brand">
           <span className="brand-mark" aria-hidden="true">
-            P
+            N
           </span>
-          PayPoint
+          NekoBet
         </span>
         <span className="who">
           {session.user.email}

@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, ApiError, Bet, BoardEvent, errorMessage } from '../api';
+import { api, ApiError, Bet, BoardEvent, errorMessage, Market, PickCode } from '../api';
 import { BET_STATUS_LABELS, formatCop, formatOdds } from '../format';
 
 interface Props {
@@ -8,10 +8,46 @@ interface Props {
   onUnauthorized: () => void;
 }
 
-type Pick = { eventId: number; selectionId: number; code: 'HOME' | 'DRAW' | 'AWAY'; label: string; match: string; odds: number };
+type Pick = { eventId: number; selectionId: number; market: Market; code: PickCode; label: string; match: string; odds: number };
 type Filter = 'LIVE' | 'SCHEDULED' | 'FINISHED';
+type Selection = BoardEvent['selections'][number];
 
-const PICK_LABEL = { HOME: '1', DRAW: 'X', AWAY: '2' } as const;
+const MARKET_LABEL: Record<Market, string> = {
+  MATCH: 'Resultado del partido',
+  DOUBLE: 'Doble oportunidad',
+  GOALS: 'Total de goles 2.5',
+  BTTS: 'Ambos equipos marcan',
+};
+const SHORT_LABEL: Record<PickCode, string> = {
+  HOME: '1',
+  DRAW: 'X',
+  AWAY: '2',
+  '1X': '1X',
+  '12': '12',
+  X2: 'X2',
+  OVER: 'Más 2.5',
+  UNDER: 'Menos 2.5',
+  YES: 'Sí',
+  NO: 'No',
+};
+const pickName = (code: PickCode, event: { home: string; away: string }) =>
+  ({
+    HOME: event.home,
+    DRAW: 'Empate',
+    AWAY: event.away,
+    '1X': `${event.home} o empate`,
+    '12': `${event.home} o ${event.away}`,
+    X2: `Empate o ${event.away}`,
+    OVER: 'Más de 2.5 goles',
+    UNDER: 'Menos de 2.5 goles',
+    YES: 'Sí',
+    NO: 'No',
+  })[code];
+const DETAIL_TABS: Array<[string, string, Market[]]> = [
+  ['ALL', 'Todos', ['MATCH', 'DOUBLE', 'GOALS', 'BTTS']],
+  ['MAIN', 'Principales', ['MATCH', 'DOUBLE']],
+  ['GOALS', 'Goles', ['GOALS', 'BTTS']],
+];
 const QUICK_STAKES = [2_000, 5_000, 10_000, 20_000, 50_000];
 const FILTERS: Array<[Filter, string]> = [
   ['LIVE', 'En vivo'],
@@ -32,6 +68,18 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
   const [pick, setPick] = useState<Pick | null>(null);
   const [filter, setFilter] = useState<Filter>('LIVE');
   const [league, setLeague] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const open = board.find((event) => event.id === openId) ?? null;
+  const choose = (event: BoardEvent, selection: Selection) =>
+    setPick({
+      eventId: event.id,
+      selectionId: selection.id,
+      market: selection.market,
+      code: selection.code,
+      label: pickName(selection.code, event),
+      match: `${event.home} vs ${event.away}`,
+      odds: selection.odds,
+    });
 
   useEffect(() => {
     const source = new EventSource('/api/betting/stream');
@@ -112,6 +160,10 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
       </aside>
 
       <section className="sb-board" aria-label="Partidos">
+        {open ? (
+          <EventDetail event={open} moves={moves} pickedId={pick?.selectionId} onPick={(selection) => choose(open, selection)} onBack={() => setOpenId(null)} />
+        ) : (
+          <>
         <div className="sb-hero">
           <div>
             <span className={connected ? 'sb-live on' : 'sb-live'}>{connected ? 'EN VIVO' : 'Conectando…'}</span>
@@ -155,10 +207,10 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
                   {event.status === 'SCHEDULED' && <span>{kickoff.format(new Date(event.startsAt))}</span>}
                   {event.status === 'FINISHED' && <span>Final</span>}
                 </div>
-                <div className="sb-teams">
+                <button type="button" className="sb-teams" onClick={() => setOpenId(event.id)} aria-label={`Ver todos los mercados de ${event.home} vs ${event.away}`}>
                   <span>{event.home}</span>
                   <span>{event.away}</span>
-                </div>
+                </button>
                 <div className="sb-score" aria-label={event.status === 'SCHEDULED' ? 'Sin iniciar' : `Marcador ${event.score[0]} a ${event.score[1]}`}>
                   {event.status !== 'SCHEDULED' && (
                     <>
@@ -168,34 +220,30 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
                   )}
                 </div>
                 <div className="sb-odds">
-                  {event.selections.map((selection) => (
+                  {event.selections.filter((selection) => selection.market === 'MATCH').map((selection) => (
                     <button
                       key={selection.id}
                       type="button"
                       className={`sb-odd ${moves[selection.id] ?? ''} ${pick?.selectionId === selection.id ? 'picked' : ''}`}
                       disabled={selection.suspended}
-                      aria-label={`${PICK_LABEL[selection.code]} ${selection.suspended ? 'suspendida' : formatOdds(selection.odds)}`}
-                      onClick={() =>
-                        setPick({
-                          eventId: event.id,
-                          selectionId: selection.id,
-                          code: selection.code,
-                          label: selection.code === 'DRAW' ? 'Empate' : selection.code === 'HOME' ? event.home : event.away,
-                          match: `${event.home} vs ${event.away}`,
-                          odds: selection.odds,
-                        })
-                      }
+                      aria-label={`${SHORT_LABEL[selection.code]} ${selection.suspended ? 'suspendida' : formatOdds(selection.odds)}`}
+                      onClick={() => choose(event, selection)}
                     >
                       {selection.suspended ? '🔒' : formatOdds(selection.odds)}
                       {moves[selection.id] && <span className="sb-arrow" aria-hidden="true">{moves[selection.id] === 'up' ? '▲' : '▼'}</span>}
                     </button>
                   ))}
+                  <button type="button" className="sb-more" onClick={() => setOpenId(event.id)} aria-label="Ver todos los mercados">
+                    +{event.selections.length - 3}
+                  </button>
                 </div>
               </article>
             ))}
           </div>
         ))}
         {visible.length === 0 && <p className="sb-empty">{board.length === 0 ? 'Cargando partidos…' : 'No hay partidos en esta vista.'}</p>}
+          </>
+        )}
       </section>
 
       <div className="sb-side">
@@ -219,11 +267,13 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
               <li key={bet.id}>
                 <div className="sb-bet-top">
                   <strong>
-                    {PICK_LABEL[bet.pick]} · {formatOdds(bet.odds)}
+                    {SHORT_LABEL[bet.pick]} · {formatOdds(bet.odds)}
                   </strong>
                   <span className={`sb-status ${bet.status.toLowerCase()}`}>{BET_STATUS_LABELS[bet.status]}</span>
                 </div>
-                <span className="sb-muted">{bet.match}</span>
+                <span className="sb-muted">
+                  {MARKET_LABEL[bet.market]} · {bet.match}
+                </span>
                 <span className="sb-bet-amounts">
                   {formatCop(bet.stake)} → {formatCop(bet.potentialPayout)}
                 </span>
@@ -313,7 +363,9 @@ function BetSlip({ pick, liveOdds, token, onPlaced, onClear, onAcceptOdds, onUna
         <div>
           <span className="sb-muted">{pick.match}</span>
           <strong>{pick.label}</strong>
-          <span className="sb-muted">Resultado del partido · {PICK_LABEL[pick.code]}</span>
+          <span className="sb-muted">
+            {MARKET_LABEL[pick.market]} · {SHORT_LABEL[pick.code]}
+          </span>
         </div>
         <span className="sb-pick-odds">{formatOdds(pick.odds)}</span>
       </div>
@@ -345,5 +397,99 @@ function BetSlip({ pick, liveOdds, token, onPlaced, onClear, onAcceptOdds, onUna
         {busy ? 'Registrando…' : `Apostar ${amount ? formatCop(amount) : ''}`}
       </button>
     </form>
+  );
+}
+
+// Two letters on a colored badge, so each fictitious club is recognizable without a logo.
+const crest = (name: string) => ({
+  initials: name
+    .split(' ')
+    .filter((word) => word.length > 2)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join(''),
+  hue: [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360,
+});
+
+interface DetailProps {
+  event: BoardEvent;
+  moves: Record<number, 'up' | 'down'>;
+  pickedId?: number;
+  onPick: (selection: Selection) => void;
+  onBack: () => void;
+}
+
+/** One match with every market, like the event page of a sportsbook. */
+function EventDetail({ event, moves, pickedId, onPick, onBack }: DetailProps) {
+  const [tab, setTab] = useState('ALL');
+  const markets = DETAIL_TABS.find(([id]) => id === tab)![2];
+  const progress = event.status === 'FINISHED' ? 100 : Math.round((event.minute / 90) * 100);
+  const state = event.status === 'LIVE' ? `${event.minute}′ · En vivo` : event.status === 'FINISHED' ? 'Final' : `Inicia ${kickoff.format(new Date(event.startsAt))}`;
+
+  return (
+    <div className="sb-detail">
+      <button type="button" className="sb-back" onClick={onBack}>
+        ← Todos los partidos
+      </button>
+      <div className="sb-scoreboard">
+        <span className="sb-detail-league">{event.league}</span>
+        <div className="sb-score-row">
+          {[event.home, event.away].map((team, index) => {
+            const { initials, hue } = crest(team);
+            return (
+              <div key={team} className={`sb-team ${index === 1 ? 'away' : ''}`}>
+                <span className="sb-crest" style={{ background: `linear-gradient(135deg, hsl(${hue} 70% 45%), hsl(${(hue + 40) % 360} 70% 30%))` }} aria-hidden="true">
+                  {initials}
+                </span>
+                <strong>{team}</strong>
+              </div>
+            );
+          })}
+          <div className="sb-big-score" aria-label={event.status === 'SCHEDULED' ? 'Sin iniciar' : `Marcador ${event.score[0]} a ${event.score[1]}`}>
+            {event.status === 'SCHEDULED' ? 'vs' : `${event.score[0]} - ${event.score[1]}`}
+            <span className={event.status === 'LIVE' ? 'sb-state live' : 'sb-state'}>{state}</span>
+          </div>
+        </div>
+        <div className="sb-progress" role="progressbar" aria-label="Tiempo jugado" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+          <span style={{ width: `${progress}%` }} />
+        </div>
+        <p className="sb-muted">Datos ficticios de demostración: los goles y las cuotas salen de una simulación.</p>
+      </div>
+
+      <div className="sb-filters" role="tablist" aria-label="Mercados">
+        {DETAIL_TABS.map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {markets.map((market) => {
+        const selections = event.selections.filter((selection) => selection.market === market);
+        if (selections.length === 0) return null;
+        return (
+          <section key={market} className="sb-market">
+            <h4>{MARKET_LABEL[market]}</h4>
+            <div className={`sb-market-odds n${selections.length}`}>
+              {selections.map((selection) => (
+                <button
+                  key={selection.id}
+                  type="button"
+                  className={`sb-odd wide ${moves[selection.id] ?? ''} ${pickedId === selection.id ? 'picked' : ''}`}
+                  disabled={selection.suspended || event.status === 'FINISHED'}
+                  onClick={() => onPick(selection)}
+                >
+                  <span>{pickName(selection.code, event)}</span>
+                  <strong>
+                    {selection.suspended ? '🔒' : formatOdds(selection.odds)}
+                    {moves[selection.id] && <span className="sb-arrow" aria-hidden="true">{moves[selection.id] === 'up' ? '▲' : '▼'}</span>}
+                  </strong>
+                </button>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
   );
 }

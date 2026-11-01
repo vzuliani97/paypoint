@@ -1,4 +1,4 @@
-# AtomicTrail design walkthrough
+# NekoBet design walkthrough
 
 ## 90-second demo
 
