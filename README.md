@@ -5,9 +5,13 @@
 [![CI](https://github.com/vzuliani97/atomictrail/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/atomictrail/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/vzuliani97/atomictrail/actions/workflows/codeql.yml/badge.svg)](https://github.com/vzuliani97/atomictrail/actions/workflows/codeql.yml)
 
+A TypeScript and PostgreSQL system that keeps balances correct under concurrent requests, retries, provider timeouts and reversals. It demonstrates idempotency, an append-only ledger, HMAC-signed integrations and real-time events.
+
 A reliability lab for a transactional API: safe state transitions in PostgreSQL ("atomic") and an auditable record of every balance movement ("trail"). The sample service inside it is **PayPoint**, a prepaid top-up and payments platform for a network of points of sale. Each store holds a prepaid balance and sells mobile top-ups and gift cards, either from a web portal or from a partner's own system through a signed B2B API. The service's code, images and metrics keep the `paypoint` name.
 
 The interesting part is not the CRUD. It is keeping money correct when requests race, retry or fail halfway.
+
+![Cashier: store balance, top-up sales and a rejected sale refunded exactly once](docs/screenshots/02-cashier-sale.png)
 
 ## What it is for
 
@@ -54,7 +58,7 @@ Everything in this repository, end to end:
 
 ![Cashier: balance, products and sales with a refunded rejection](docs/screenshots/02-cashier-sale.png)
 
-### 2. Place a live bet
+### 2. Place a live bet (simulated scenario)
 
 ```mermaid
 sequenceDiagram
@@ -80,7 +84,7 @@ sequenceDiagram
 
 ![Sportsbook: live matches, moving odds, bet slip and my bets](docs/screenshots/04-live-betting.png)
 
-### 3. Play the casino (seamless wallet)
+### 3. Play the casino (simulated scenario, seamless wallet)
 
 1. The game provider calls the wallet to debit a bet, credit a win or roll back, signing each callback with HMAC.
 2. Every callback is idempotent by the provider's transaction id: a retry gets the same answer and moves no money twice.
@@ -106,9 +110,9 @@ The admin creates points of sale, credits their balances and watches sales acros
 - **Quality:** Jest + Supertest, 48 tests (10 unit, 38 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
 - **Delivery:** multi-stage Docker images running as non-root, Docker Compose, GitHub Actions publishing to GHCR. Deployed to Kubernetes in [OpsCircuit](https://github.com/vzuliani97/opscircuit).
 
-## Live betting and casino
+## Simulated scenarios: live betting and casino
 
-The same prepaid balance funds top-ups, live sports bets and casino rounds. Every stake, payout and wallet operation is a ledger movement, so the balance stays explainable.
+These are stress scenarios for the same guarantees, not the identity of the project. The same prepaid balance funds top-ups, live sports bets and casino rounds. Every stake, payout and wallet operation is a ledger movement, so the balance stays explainable.
 
 ![Live betting: sports and leagues menu, matches grouped by league with minute, score and 1X2 odds that move in real time, the bet slip and my bets](docs/screenshots/04-live-betting.png)
 

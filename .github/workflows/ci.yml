@@ -25,6 +25,9 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - name: Published images carry no metadata (GPS, camera, capture time, XMP, IPTC)
+        working-directory: .
+        run: node scripts/image-metadata.mjs check docs
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
