@@ -9,6 +9,27 @@ A reliability lab for a transactional API: safe state transitions in PostgreSQL 
 
 The interesting part is not the CRUD. It is keeping money correct when requests race, retry or fail halfway.
 
+## What it is for
+
+A network of stores sells prepaid top-ups, live sports bets and casino play from one prepaid balance per store. Cashiers use a web portal; partner systems use a signed B2B API; providers (carrier, odds feed, game provider) answer late or not at all. The balance must stay right through all of it.
+
+| Who | What they do here |
+|---|---|
+| Cashier | Sells top-ups, places live bets from the sportsbook (odds move in real time), opens casino games paid from the same balance, and sees every balance movement |
+| Admin | Creates points of sale, credits balances, watches network sales |
+| Partner system | Sells through the HMAC-signed API with its own idempotency keys |
+
+## What I built
+
+Everything in this repository, end to end:
+
+- **Data model:** balances guarded by `CHECK (balance >= 0)`, an append-only ledger, sales, bets, settlements and casino wallet transactions, in plain versioned SQL.
+- **API (NestJS):** idempotent sales with a per-key advisory lock and request hash, the provider call outside the transaction, refunds at most once, an HMAC-SHA256 partner API with an IP allowlist, JWT roles and Zod validation.
+- **Live betting:** a simulated odds feed with a single leader (`pg_try_advisory_xact_lock`), Server-Sent Events to the browser, `ODDS_CHANGED` when the price moved, settlement paid exactly once.
+- **Casino:** a seamless wallet whose provider callbacks are idempotent by transaction id, with rollback tombstones.
+- **Frontend (React):** the cashier with top-ups, the sportsbook (leagues, live minute and score, 1X2 odds, bet slip, my bets) and the casino; the admin screens.
+- **Delivery and quality:** Docker Compose, Prometheus metrics, multi-arch images published by CI and deployed by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit), 48 automated tests, CodeQL, Gitleaks and `npm audit`.
+
 | Problem | How PayPoint handles it | Proof |
 |---|---|---|
 | Two sales spend the same balance at once | Check and debit in one conditional `UPDATE`, plus `CHECK (balance >= 0)` | 70 concurrent sales against room for 50 approve exactly 50 ([local experiment](docs/concurrency-experiment.md), not a production benchmark) |
