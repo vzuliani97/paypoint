@@ -5,6 +5,7 @@ import { AppError } from '../common/app-error';
 import { APP_CONFIG, AppConfig } from '../config';
 import { DatabaseService } from '../database/database.service';
 import { AuthUser, JwtPayload, Role } from './auth.types';
+import { LoginAttempts } from './login-attempts';
 
 interface UserRow {
   id: string;
@@ -19,13 +20,21 @@ const DUMMY_HASH = bcrypt.hashSync('timing-equalizer', 10);
 
 @Injectable()
 export class AuthService {
+  private readonly attempts = new LoginAttempts();
+
   constructor(
     private readonly db: DatabaseService,
     private readonly jwt: JwtService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, ip: string) {
+    const attemptKey = `${ip}|${email.toLowerCase()}`;
+    const retryAfterSeconds = this.attempts.lockedFor(attemptKey);
+    if (retryAfterSeconds > 0) {
+      throw new AppError(429, 'TOO_MANY_ATTEMPTS', 'Too many failed logins; try again later', { retryAfterSeconds });
+    }
+
     const { rows } = await this.db.query<UserRow>(
       'SELECT id, email, password_hash, role, pos_id FROM users WHERE email = $1',
       [email.toLowerCase()],
@@ -35,8 +44,10 @@ export class AuthService {
 
     // Same error for unknown email and wrong password: do not reveal which accounts exist.
     if (!user || !passwordMatches) {
+      this.attempts.recordFailure(attemptKey);
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
+    this.attempts.reset(attemptKey);
 
     const authUser: AuthUser = { id: user.id, email: user.email, role: user.role, posId: user.pos_id };
     const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role, posId: user.pos_id };

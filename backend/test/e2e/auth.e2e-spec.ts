@@ -7,6 +7,7 @@ import {
   createUser,
   ledgerSum,
   login,
+  PASSWORD,
   resetDatabase,
   TestContext,
 } from './helpers';
@@ -46,6 +47,22 @@ describe('Authentication and authorization', () => {
     expect(wrongPassword.status).toBe(401);
     expect(unknownEmail.status).toBe(401);
     expect(wrongPassword.body).toEqual(unknownEmail.body);
+  });
+
+  it('locks one email from one address after 5 failed logins, even for the right password', async () => {
+    await createUser(ctx.pool, 'locked@test.local', 'CASHIER', posA);
+    const attempt = (email: string, password: string) => ctx.http().post('/api/auth/login').send({ email, password });
+
+    for (let i = 0; i < 5; i += 1) {
+      expect((await attempt('locked@test.local', 'wrong-password')).status).toBe(401);
+    }
+    const locked = await attempt('locked@test.local', PASSWORD);
+    expect(locked.status).toBe(429);
+    expect(locked.body.error.code).toBe('TOO_MANY_ATTEMPTS');
+    expect(locked.body.error.details.retryAfterSeconds).toBeGreaterThan(0);
+
+    // Another account from the same address still signs in.
+    expect((await attempt('cajero.b@test.local', PASSWORD)).status).toBe(200);
   });
 
   it('rejects missing and tampered tokens', async () => {

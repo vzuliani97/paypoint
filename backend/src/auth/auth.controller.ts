@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Ip, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from './auth.decorators';
@@ -21,8 +21,8 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  login(@Body(new ZodValidationPipe(loginSchema)) body: LoginInput) {
-    return this.auth.login(body.email, body.password);
+  login(@Body(new ZodValidationPipe(loginSchema)) body: LoginInput, @Ip() ip: string) {
+    return this.auth.login(body.email, body.password, ip);
   }
 
   @Get('me')

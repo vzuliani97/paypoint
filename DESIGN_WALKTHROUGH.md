@@ -34,7 +34,7 @@ The client signs `timestamp \n METHOD \n path \n sha256(body)`, and we recompute
 Unchanged. All locks and invariants live in PostgreSQL and the API is stateless. Migrations already take an advisory lock so replicas don't race. The next bottleneck would be hot rows (one very busy store), which could be handled with sharded sub-balances.
 
 **9. What would you build next?**
-Reconciliation of `PENDING` sales, idempotent admin credits, secrets in KMS, rate limiting on login, and an outbox for events.
+Reconciliation of `PENDING` sales, idempotent admin credits, secrets in KMS, a shared store for the login limiter when there are several replicas, and an outbox for events.
 
 **10. Did you use AI tools?**
 I used AI coding tools to accelerate implementation. I defined the requirements and constraints, ran the system, evaluated the results and accepted only behavior verified through reproducible tests and CI. I can explain the decisions I have personally reviewed.

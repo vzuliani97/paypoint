@@ -32,7 +32,7 @@ Everything in this repository, end to end:
 - **Live betting:** a simulated odds feed with a single leader (`pg_try_advisory_xact_lock`), Server-Sent Events to the browser, `ODDS_CHANGED` when the price moved, settlement paid exactly once.
 - **Casino:** a seamless wallet whose provider callbacks are idempotent by transaction id, with rollback tombstones.
 - **Frontend (React):** the cashier with top-ups, the sportsbook (leagues, live minute and score, 1X2 odds, bet slip, my bets) and the casino; the admin screens.
-- **Delivery and quality:** Docker Compose, Prometheus metrics, multi-arch images published by CI and deployed by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit), 48 automated tests, CodeQL, Gitleaks and `npm audit`.
+- **Delivery and quality:** Docker Compose, Prometheus metrics, multi-arch images published by CI and deployed by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit), 49 automated tests, CodeQL, Gitleaks and `npm audit`.
 
 | Problem | How PayPoint handles it | Proof |
 |---|---|---|
@@ -107,7 +107,7 @@ The admin creates points of sale, credits their balances and watches sales acros
 - **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations), Zod, JWT, bcrypt, Helmet, Prometheus metrics
 - **Frontend:** React 19 + TypeScript (Vite), served by unprivileged nginx
 - **Real time:** Server-Sent Events for the live odds board, a simulated odds feed with one leader across replicas (PostgreSQL advisory lock)
-- **Quality:** Jest + Supertest, 48 tests (10 unit, 38 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
+- **Quality:** Jest + Supertest, 49 tests (10 unit, 39 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
 - **Delivery:** multi-stage Docker images running as non-root, Docker Compose, GitHub Actions publishing to GHCR. Deployed to Kubernetes in [OpsCircuit](https://github.com/vzuliani97/opscircuit).
 
 ## Simulated scenarios: live betting and casino
@@ -191,6 +191,8 @@ Highlights: 70-way concurrency on balance and idempotency, refunds exactly once,
 ## Security
 
 - bcrypt passwords. Login gives the same answer, in the same time, for an unknown email and a wrong password.
+- After 5 failed logins for one email from one address, that pair is locked for 15 minutes (`429 TOO_MANY_ATTEMPTS`), even for the right password. The counter lives in memory, so each API replica counts on its own.
+- The demo casino and partner secrets are published in this repository, so the API refuses to start with them in production unless it runs in demo mode.
 - JWT pinned to HS256; role checks on every route; the store id comes from the token, never from the request.
 - Strict Zod validation (unknown fields rejected), 10 KB body limit, Helmet headers, CORS restricted.
 - nginx overwrites `X-Forwarded-For` and the API trusts exactly one proxy hop, so clients can't spoof their IP into the allowlist. nginx also fails fast (504 after 3 s) when the API is down.
