@@ -5,15 +5,15 @@
 [![CI](https://github.com/vzuliani97/nekobet/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/nekobet/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/vzuliani97/nekobet/actions/workflows/codeql.yml/badge.svg)](https://github.com/vzuliani97/nekobet/actions/workflows/codeql.yml)
 
-A point-of-sale platform where every store sells live sports bets, casino games and prepaid top-ups from one balance: a sportsbook with live odds and several markets per match, a casino lobby with slot machines and table games, and a cashier for top-ups. Built in TypeScript and PostgreSQL as a transaction reliability lab: the balance stays correct under concurrent requests, retries, provider timeouts and reversals, with idempotency, an append-only ledger, HMAC-signed integrations and real-time events.
+A point-of-sale platform where every store sells live sports bets, casino games and prepaid top-ups from one balance: a real-time sportsbook for football, basketball, baseball and ice hockey with several markets per event, a casino lobby with slot machines and table games, and a cashier for top-ups. Built in TypeScript and PostgreSQL as a transaction reliability lab: the balance stays correct under concurrent requests, retries, provider timeouts and reversals, with idempotency, an append-only ledger, HMAC-signed integrations and real-time events.
 
-Matches, odds, games and the carrier are simulated, and all data is fictitious; NekoBet is a demonstration, not a licensed betting service. The service's code, images and metrics keep the `paypoint` name.
+Everything runs in real time. The production betting platforms I worked on, their providers and their data are confidential, so this public version runs on a simulated feed of fictitious events, odds and games. NekoBet is a demonstration, not a licensed betting service. The service's code, images and metrics keep the `paypoint` name.
 
 ![Live sportsbook: matches by league with minute, score and moving 1X2 odds, a "+7" link to every market, the bet slip with an odds-change notice, and my bets](docs/screenshots/04-live-betting.png)
 
-| Event page with every market | Casino lobby and slot machine |
-|---|---|
-| ![Event page: scoreboard, match result, double chance, total goals 2.5 and both teams to score](docs/screenshots/06-event-markets.png) | ![Casino: five fictitious games, a slot machine paying x2 through the wallet, and the last rounds](docs/screenshots/05-casino.png) |
+| Football event with every market | Basketball, live by quarter | Casino lobby and slot machine |
+|---|---|---|
+| ![Football event page: scoreboard, match result, double chance, total goals 2.5 and both teams to score](docs/screenshots/06-event-markets.png) | ![Basketball event page: score by quarter, winner and total points 217.5](docs/screenshots/07-basketball-event.png) | ![Casino: five games, a slot machine paying x20 through the wallet, and the last rounds](docs/screenshots/05-casino.png) |
 
 The interesting part is not the screens. It is keeping money correct when requests race, retry or fail halfway.
 
@@ -33,10 +33,10 @@ Everything in this repository, end to end:
 
 - **Data model:** balances guarded by `CHECK (balance >= 0)`, an append-only ledger, sales, bets, settlements and casino wallet transactions, in plain versioned SQL.
 - **API (NestJS):** idempotent sales with a per-key advisory lock and request hash, the provider call outside the transaction, refunds at most once, an HMAC-SHA256 partner API with an IP allowlist, JWT roles and Zod validation.
-- **Live betting:** a simulated odds feed with a single leader (`pg_try_advisory_xact_lock`) that prices four markets per match from one goal model (match result, double chance, total goals 2.5, both teams to score), Server-Sent Events to the browser, `ODDS_CHANGED` when the price moved, and settlement of every market paid exactly once.
+- **Live betting:** a simulated odds feed with a single leader (`pg_try_advisory_xact_lock`) for four sports, each with its own clock and scoring model: football and ice hockey (Poisson goals, three-way result, double chance, total goals, both teams to score), basketball (quarters and overtime, a normal model of points, winner and total points) and baseball (innings and extra innings, Poisson runs, winner and total runs), Server-Sent Events to the browser, `ODDS_CHANGED` when the price moved, and settlement of every market paid exactly once.
 - **Casino:** a seamless wallet whose provider callbacks are idempotent by transaction id, with rollback tombstones; five fictitious games, three of them slot machines whose reels show the outcome the provider decided.
-- **Frontend (React):** the cashier with top-ups; the sportsbook with leagues, live minute and score, an event page with every market, bet slip and my bets; the casino lobby with an animated slot machine; the admin screens.
-- **Delivery and quality:** Docker Compose, Prometheus metrics, multi-arch images published by CI and deployed by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit), 52 automated tests, CodeQL, Gitleaks and `npm audit`.
+- **Frontend (React):** the cashier with top-ups; the sportsbook with sports and leagues, each sport's clock and score, an event page with every market, bet slip and my bets; the casino lobby with an animated slot machine; the admin screens.
+- **Delivery and quality:** Docker Compose, Prometheus metrics, multi-arch images published by CI and deployed by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit), 54 automated tests, CodeQL, Gitleaks and `npm audit`.
 
 | Problem | How NekoBet handles it | Proof |
 |---|---|---|
@@ -82,7 +82,7 @@ sequenceDiagram
   F->>DB: final whistle, settle every bet, payout exactly once
 ```
 
-1. The board shows live matches by league with minute, score and 1X2 odds that move up or down; "+7" opens the event page with every market: match result, double chance, total goals 2.5 and both teams to score. Goals markets are priced with a Poisson model over the minutes left and suspended once the score decides them.
+1. The board shows live events by sport and league with each sport's clock (minute, quarter or inning), the score and the result odds moving up or down; "+N" opens the event page with every market. Football and hockey have match result, double chance, total goals and both teams to score; basketball and baseball have winner and total points or runs. Totals are priced over the time left and suspended once the score decides them; basketball and baseball play overtime or extra innings until someone leads.
 2. A tap on a price fills the bet slip; the bet carries the odds the cashier saw. If the price moved, the API refuses with `ODDS_CHANGED` and the slip offers the new one.
 3. At the final whistle every market is settled from the final score; a unique index guarantees one payout per bet.
 
@@ -112,7 +112,7 @@ The admin creates points of sale, credits their balances and watches sales acros
 - **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations), Zod, JWT, bcrypt, Helmet, Prometheus metrics
 - **Frontend:** React 19 + TypeScript (Vite), served by unprivileged nginx
 - **Real time:** Server-Sent Events for the live odds board, a simulated odds feed with one leader across replicas (PostgreSQL advisory lock)
-- **Quality:** Jest + Supertest, 52 tests (12 unit, 40 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
+- **Quality:** Jest + Supertest, 54 tests (14 unit, 40 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
 - **Delivery:** multi-stage Docker images running as non-root, Docker Compose, GitHub Actions publishing to GHCR. Deployed to Kubernetes in [OpsCircuit](https://github.com/vzuliani97/opscircuit).
 
 ## Architecture
@@ -193,7 +193,7 @@ Highlights: 70-way concurrency on balance and idempotency, refunds exactly once,
 
 ## Known limitations
 
-- **Betting and casino are a demonstration.** Teams, leagues and games are fictitious; the odds feed and the game provider are simulated. Real online betting in Colombia requires a Coljuegos license, and there are no responsible-gaming limits, player accounts or KYC here: the "wallet" is the store's prepaid balance.
+- **Betting and casino are a demonstration.** The production platforms and their data are confidential, so teams, leagues and games here are fictitious and the odds feed and game provider are simulated, running in real time. A real operator in Colombia needs a Coljuegos license; this code is not one.
 
 - **Reconciliation of `PENDING` sales** is not implemented yet (a job that asks the provider and confirms or refunds).
 - HMAC secrets are stored in plain text in the database. Production would use KMS or Secrets Manager.

@@ -177,9 +177,9 @@ describe('Live betting and casino', () => {
     const odds = await ctx.pool.query<{ odds_x100: number }>('SELECT odds_x100 FROM selections WHERE id = $1', [running.draw]);
     expect(odds.rows[0].odds_x100).not.toBe(320); // a level match moves toward the draw
     expect(await balanceOf(ctx.pool, posId)).toBe(60_000);
-    // The feed refilled the board to six open matches before this tick finished one of them.
+    // The feed refilled the board to ten open events before this tick finished one of them.
     const open = await ctx.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM sports_events WHERE status <> 'FINISHED'");
-    expect(open.rows[0].n).toBe(5);
+    expect(open.rows[0].n).toBe(9);
   });
 
   it('streams the live board as server-sent events', async () => {

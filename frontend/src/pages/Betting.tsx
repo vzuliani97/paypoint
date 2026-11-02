@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, ApiError, Bet, BoardEvent, errorMessage, Market, PickCode } from '../api';
+import { api, ApiError, Bet, BoardEvent, errorMessage, Market, PickCode, Sport } from '../api';
 import { BET_STATUS_LABELS, formatCop, formatOdds } from '../format';
 
 interface Props {
@@ -8,16 +8,43 @@ interface Props {
   onUnauthorized: () => void;
 }
 
-type Pick = { eventId: number; selectionId: number; market: Market; code: PickCode; label: string; match: string; odds: number };
+type Pick = { eventId: number; selectionId: number; market: Market; code: PickCode; label: string; marketLabel: string; match: string; odds: number };
 type Filter = 'LIVE' | 'SCHEDULED' | 'FINISHED';
 type Selection = BoardEvent['selections'][number];
 
-const MARKET_LABEL: Record<Market, string> = {
-  MATCH: 'Resultado del partido',
-  DOUBLE: 'Doble oportunidad',
-  GOALS: 'Total de goles 2.5',
-  BTTS: 'Ambos equipos marcan',
+const SPORTS: Record<Sport, { label: string; icon: string; unit: string; length: number }> = {
+  FUTBOL: { label: 'Fútbol', icon: '⚽', unit: 'goles', length: 90 },
+  BALONCESTO: { label: 'Baloncesto', icon: '🏀', unit: 'puntos', length: 48 },
+  BEISBOL: { label: 'Béisbol', icon: '⚾', unit: 'carreras', length: 54 },
+  HOCKEY: { label: 'Hockey', icon: '🏒', unit: 'goles', length: 60 },
 };
+const twoWay = (event: BoardEvent) => !event.selections.some((selection) => selection.code === 'DRAW');
+
+/** The 1, X and 2 columns of the board; a two-way sport leaves the middle one empty. */
+function matchSlots(event: BoardEvent): Array<BoardEvent['selections'][number] | null> {
+  const match = event.selections.filter((selection) => selection.market === 'MATCH');
+  const find = (code: PickCode) => match.find((selection) => selection.code === code) ?? null;
+  return [find('HOME'), find('DRAW'), find('AWAY')];
+}
+
+/** The clock as each sport reads it: minutes, quarters with overtime, or innings (top ▲ and bottom ▼). */
+function clock(event: BoardEvent): string {
+  const { sport, minute } = event;
+  if (sport === 'BALONCESTO') return minute > 48 ? 'Prórroga' : `C${Math.min(4, Math.floor((Math.max(1, minute) - 1) / 12) + 1)} · ${minute}′`;
+  if (sport === 'BEISBOL') {
+    const out = Math.max(1, minute) - 1;
+    return `${out % 6 < 3 ? '▲' : '▼'}${Math.floor(out / 6) + 1}`;
+  }
+  return `${minute}′`;
+}
+
+const marketLabel = (market: Market, event: { sport: Sport; totalLine: number; twoWay?: boolean }) =>
+  ({
+    MATCH: event.twoWay ? 'Ganador' : 'Resultado del partido',
+    DOUBLE: 'Doble oportunidad',
+    GOALS: `Total de ${SPORTS[event.sport].unit} ${event.totalLine}`,
+    BTTS: 'Ambos equipos marcan',
+  })[market];
 const SHORT_LABEL: Record<PickCode, string> = {
   HOME: '1',
   DRAW: 'X',
@@ -25,12 +52,12 @@ const SHORT_LABEL: Record<PickCode, string> = {
   '1X': '1X',
   '12': '12',
   X2: 'X2',
-  OVER: 'Más 2.5',
-  UNDER: 'Menos 2.5',
+  OVER: 'Más',
+  UNDER: 'Menos',
   YES: 'Sí',
   NO: 'No',
 };
-const pickName = (code: PickCode, event: { home: string; away: string }) =>
+const pickName = (code: PickCode, event: { home: string; away: string; sport: Sport; totalLine: number }) =>
   ({
     HOME: event.home,
     DRAW: 'Empate',
@@ -38,15 +65,15 @@ const pickName = (code: PickCode, event: { home: string; away: string }) =>
     '1X': `${event.home} o empate`,
     '12': `${event.home} o ${event.away}`,
     X2: `Empate o ${event.away}`,
-    OVER: 'Más de 2.5 goles',
-    UNDER: 'Menos de 2.5 goles',
+    OVER: `Más de ${event.totalLine} ${SPORTS[event.sport].unit}`,
+    UNDER: `Menos de ${event.totalLine} ${SPORTS[event.sport].unit}`,
     YES: 'Sí',
     NO: 'No',
   })[code];
 const DETAIL_TABS: Array<[string, string, Market[]]> = [
   ['ALL', 'Todos', ['MATCH', 'DOUBLE', 'GOALS', 'BTTS']],
   ['MAIN', 'Principales', ['MATCH', 'DOUBLE']],
-  ['GOALS', 'Goles', ['GOALS', 'BTTS']],
+  ['GOALS', 'Totales', ['GOALS', 'BTTS']],
 ];
 const QUICK_STAKES = [2_000, 5_000, 10_000, 20_000, 50_000];
 const FILTERS: Array<[Filter, string]> = [
@@ -68,6 +95,7 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
   const [pick, setPick] = useState<Pick | null>(null);
   const [filter, setFilter] = useState<Filter>('LIVE');
   const [league, setLeague] = useState<string | null>(null);
+  const [sport, setSport] = useState<Sport | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
   const open = board.find((event) => event.id === openId) ?? null;
   const choose = (event: BoardEvent, selection: Selection) =>
@@ -77,6 +105,7 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
       market: selection.market,
       code: selection.code,
       label: pickName(selection.code, event),
+      marketLabel: marketLabel(selection.market, { ...event, twoWay: twoWay(event) }),
       match: `${event.home} vs ${event.away}`,
       odds: selection.odds,
     });
@@ -128,12 +157,19 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
     () => Object.fromEntries(FILTERS.map(([status]) => [status, board.filter((event) => event.status === status).length])) as Record<Filter, number>,
     [board],
   );
+  const sports = useMemo(() => {
+    const totals = new Map<Sport, number>();
+    for (const event of board) if (event.status === filter) totals.set(event.sport, (totals.get(event.sport) ?? 0) + 1);
+    return (Object.keys(SPORTS) as Sport[]).map((code) => [code, totals.get(code) ?? 0] as const);
+  }, [board, filter]);
   const leagues = useMemo(() => {
     const totals = new Map<string, number>();
-    for (const event of board) if (event.status === filter) totals.set(event.league, (totals.get(event.league) ?? 0) + 1);
+    for (const event of board) {
+      if (event.status === filter && (!sport || event.sport === sport)) totals.set(event.league, (totals.get(event.league) ?? 0) + 1);
+    }
     return [...totals.entries()];
-  }, [board, filter]);
-  const visible = board.filter((event) => event.status === filter && (!league || event.league === league));
+  }, [board, filter, sport]);
+  const visible = board.filter((event) => event.status === filter && (!sport || event.sport === sport) && (!league || event.league === league));
   const grouped = useMemo(() => {
     const groups = new Map<string, BoardEvent[]>();
     for (const event of visible) groups.set(event.league, [...(groups.get(event.league) ?? []), event]);
@@ -145,9 +181,29 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
     <div className="sportsbook">
       <aside className="sb-menu" aria-label="Deportes y ligas">
         <p className="sb-label">Deportes</p>
-        <button type="button" className="sb-sport active">
-          <span aria-hidden="true">⚽</span> Fútbol <span className="sb-count">{board.length}</span>
+        <button
+          type="button"
+          className={sport === null ? 'sb-sport active' : 'sb-sport'}
+          onClick={() => {
+            setSport(null);
+            setLeague(null);
+          }}
+        >
+          <span aria-hidden="true">🏆</span> Todos <span className="sb-count">{sports.reduce((sum, [, n]) => sum + n, 0)}</span>
         </button>
+        {sports.map(([code, total]) => (
+          <button
+            key={code}
+            type="button"
+            className={sport === code ? 'sb-sport active' : 'sb-sport'}
+            onClick={() => {
+              setSport(code);
+              setLeague(null);
+            }}
+          >
+            <span aria-hidden="true">{SPORTS[code].icon}</span> {SPORTS[code].label} <span className="sb-count">{total}</span>
+          </button>
+        ))}
         <p className="sb-label">Ligas</p>
         <button type="button" className={league === null ? 'sb-league active' : 'sb-league'} onClick={() => setLeague(null)}>
           Todas <span className="sb-count">{leagues.reduce((sum, [, n]) => sum + n, 0)}</span>
@@ -168,7 +224,7 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
           <div>
             <span className={connected ? 'sb-live on' : 'sb-live'}>{connected ? 'EN VIVO' : 'Conectando…'}</span>
             <h2>Apuestas deportivas</h2>
-            <p>Cuotas que se actualizan en tiempo real. Datos ficticios de demostración.</p>
+            <p>Cuotas en tiempo real. Feed simulado: los datos de producción son confidenciales.</p>
           </div>
           <strong className="sb-hero-count">{counts.LIVE}</strong>
         </div>
@@ -193,17 +249,20 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
         {grouped.map(([name, events]) => (
           <div key={name} className="sb-group">
             <div className="sb-group-head">
-              <span>{name}</span>
+              <span>
+                <span aria-hidden="true">{SPORTS[events[0].sport].icon}</span> {name}
+              </span>
               <span className="sb-cols" aria-hidden="true">
                 <span>1</span>
-                <span>X</span>
+                <span>{twoWay(events[0]) ? '' : 'X'}</span>
                 <span>2</span>
+                <span />
               </span>
             </div>
             {events.map((event) => (
               <article key={event.id} className={goals[event.id] ? 'sb-event goal' : 'sb-event'}>
                 <div className="sb-time">
-                  {event.status === 'LIVE' && <span className="sb-minute">{event.minute}′</span>}
+                  {event.status === 'LIVE' && <span className="sb-minute">{clock(event)}</span>}
                   {event.status === 'SCHEDULED' && <span>{kickoff.format(new Date(event.startsAt))}</span>}
                   {event.status === 'FINISHED' && <span>Final</span>}
                 </div>
@@ -220,7 +279,10 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
                   )}
                 </div>
                 <div className="sb-odds">
-                  {event.selections.filter((selection) => selection.market === 'MATCH').map((selection) => (
+                  {matchSlots(event).map((selection, slot) =>
+                    selection === null ? (
+                      <span key={`gap-${slot}`} className="sb-odd-gap" aria-hidden="true" />
+                    ) : (
                     <button
                       key={selection.id}
                       type="button"
@@ -232,9 +294,10 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
                       {selection.suspended ? '🔒' : formatOdds(selection.odds)}
                       {moves[selection.id] && <span className="sb-arrow" aria-hidden="true">{moves[selection.id] === 'up' ? '▲' : '▼'}</span>}
                     </button>
-                  ))}
+                    ),
+                  )}
                   <button type="button" className="sb-more" onClick={() => setOpenId(event.id)} aria-label="Ver todos los mercados">
-                    +{event.selections.length - 3}
+                    +{event.selections.length - (twoWay(event) ? 2 : 3)}
                   </button>
                 </div>
               </article>
@@ -267,12 +330,13 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
               <li key={bet.id}>
                 <div className="sb-bet-top">
                   <strong>
-                    {SHORT_LABEL[bet.pick]} · {formatOdds(bet.odds)}
+                    {SHORT_LABEL[bet.pick]}
+                    {(bet.pick === 'OVER' || bet.pick === 'UNDER') && ` ${bet.totalLine}`} · {formatOdds(bet.odds)}
                   </strong>
                   <span className={`sb-status ${bet.status.toLowerCase()}`}>{BET_STATUS_LABELS[bet.status]}</span>
                 </div>
                 <span className="sb-muted">
-                  {MARKET_LABEL[bet.market]} · {bet.match}
+                  {marketLabel(bet.market, bet)} · {bet.match}
                 </span>
                 <span className="sb-bet-amounts">
                   {formatCop(bet.stake)} → {formatCop(bet.potentialPayout)}
@@ -364,7 +428,7 @@ function BetSlip({ pick, liveOdds, token, onPlaced, onClear, onAcceptOdds, onUna
           <span className="sb-muted">{pick.match}</span>
           <strong>{pick.label}</strong>
           <span className="sb-muted">
-            {MARKET_LABEL[pick.market]} · {SHORT_LABEL[pick.code]}
+            {pick.marketLabel}
           </span>
         </div>
         <span className="sb-pick-odds">{formatOdds(pick.odds)}</span>
@@ -404,7 +468,7 @@ function BetSlip({ pick, liveOdds, token, onPlaced, onClear, onAcceptOdds, onUna
 const crest = (name: string) => ({
   initials: name
     .split(' ')
-    .filter((word) => word.length > 2)
+    .filter((word) => word.length > 3)
     .slice(0, 2)
     .map((word) => word[0])
     .join(''),
@@ -423,8 +487,8 @@ interface DetailProps {
 function EventDetail({ event, moves, pickedId, onPick, onBack }: DetailProps) {
   const [tab, setTab] = useState('ALL');
   const markets = DETAIL_TABS.find(([id]) => id === tab)![2];
-  const progress = event.status === 'FINISHED' ? 100 : Math.round((event.minute / 90) * 100);
-  const state = event.status === 'LIVE' ? `${event.minute}′ · En vivo` : event.status === 'FINISHED' ? 'Final' : `Inicia ${kickoff.format(new Date(event.startsAt))}`;
+  const progress = event.status === 'FINISHED' ? 100 : Math.min(100, Math.round((event.minute / SPORTS[event.sport].length) * 100));
+  const state = event.status === 'LIVE' ? `${clock(event)} · En vivo` : event.status === 'FINISHED' ? 'Final' : `Inicia ${kickoff.format(new Date(event.startsAt))}`;
 
   return (
     <div className="sb-detail">
@@ -432,7 +496,9 @@ function EventDetail({ event, moves, pickedId, onPick, onBack }: DetailProps) {
         ← Todos los partidos
       </button>
       <div className="sb-scoreboard">
-        <span className="sb-detail-league">{event.league}</span>
+        <span className="sb-detail-league">
+          {SPORTS[event.sport].icon} {SPORTS[event.sport].label} · {event.league}
+        </span>
         <div className="sb-score-row">
           {[event.home, event.away].map((team, index) => {
             const { initials, hue } = crest(team);
@@ -453,7 +519,7 @@ function EventDetail({ event, moves, pickedId, onPick, onBack }: DetailProps) {
         <div className="sb-progress" role="progressbar" aria-label="Tiempo jugado" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
           <span style={{ width: `${progress}%` }} />
         </div>
-        <p className="sb-muted">Datos ficticios de demostración: los goles y las cuotas salen de una simulación.</p>
+        <p className="sb-muted">En tiempo real con un feed simulado: los datos de producción son confidenciales.</p>
       </div>
 
       <div className="sb-filters" role="tablist" aria-label="Mercados">
@@ -469,7 +535,7 @@ function EventDetail({ event, moves, pickedId, onPick, onBack }: DetailProps) {
         if (selections.length === 0) return null;
         return (
           <section key={market} className="sb-market">
-            <h4>{MARKET_LABEL[market]}</h4>
+            <h4>{marketLabel(market, { ...event, twoWay: twoWay(event) })}</h4>
             <div className={`sb-market-odds n${selections.length}`}>
               {selections.map((selection) => (
                 <button

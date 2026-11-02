@@ -45,8 +45,12 @@ export interface PointOfSale {
   active: boolean;
 }
 
+export type Sport = 'FUTBOL' | 'BALONCESTO' | 'BEISBOL' | 'HOCKEY';
+
 export interface BoardEvent {
   id: number;
+  sport: Sport;
+  totalLine: number;
   league: string;
   home: string;
   away: string;
@@ -64,6 +68,8 @@ export interface Bet {
   id: string;
   market: Market;
   pick: PickCode;
+  sport: Sport;
+  totalLine: number;
   match: string;
   league: string;
   stake: number;

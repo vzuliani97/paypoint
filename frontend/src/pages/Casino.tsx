@@ -122,7 +122,7 @@ export function Casino({ token, onCompleted, onUnauthorized }: Props) {
         <div>
           <span className="cs-tag">Casino en línea</span>
           <h2>Juegos con billetera integrada</h2>
-          <p>Juegos ficticios. El proveedor simulado debita la apuesta y acredita el premio en el saldo con transacciones idempotentes.</p>
+          <p>Juegos de un proveedor simulado (los reales son confidenciales): debita la apuesta y acredita el premio en el saldo con transacciones idempotentes.</p>
         </div>
         <span className="cs-hero-glyph" aria-hidden="true">
           🎰

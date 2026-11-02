@@ -725,7 +725,7 @@ th.num {
 .sb-cols,
 .sb-odds {
   display: grid;
-  grid-template-columns: repeat(3, 68px) 40px;
+  grid-template-columns: repeat(3, 60px) 34px;
   gap: 0.4rem;
   text-align: center;
 }
@@ -1668,4 +1668,10 @@ button.sb-teams:hover span {
   position: static;
   margin-left: 0.3rem;
   font-size: 0.7rem;
+}
+
+/* ---------- Sportsbook: several sports ---------- */
+
+.sb-odd-gap {
+  min-height: 42px;
 }

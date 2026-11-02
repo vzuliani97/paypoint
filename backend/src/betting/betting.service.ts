@@ -30,6 +30,7 @@ interface BoardRow {
   home_score: number;
   away_score: number;
   version: number;
+  total_line: string;
   selection_id: number;
   market: MarketCode;
   code: SelectionCode;
@@ -53,10 +54,12 @@ interface BetRow {
   home: string;
   away: string;
   league: string;
+  sport: string;
+  total_line: string;
 }
 
 const SELECT_BET = `
-  SELECT b.*, s.market, s.code, e.home, e.away, e.league
+  SELECT b.*, s.market, s.code, e.home, e.away, e.league, e.sport, e.total_line
   FROM bets b
   JOIN selections s ON s.id = b.selection_id
   JOIN sports_events e ON e.id = s.event_id
@@ -69,6 +72,8 @@ export const toBet = (row: BetRow) => ({
   pick: row.code,
   match: `${row.home} vs ${row.away}`,
   league: row.league,
+  sport: row.sport,
+  totalLine: Number(row.total_line),
   stake: row.stake,
   odds: row.odds_x100 / 100,
   potentialPayout: row.potential_payout,
@@ -84,14 +89,14 @@ export const payoutFor = (stake: number, oddsX100: number) => Math.floor((stake 
 
 export const winningCode = (home: number, away: number): SelectionCode => (home > away ? 'HOME' : home < away ? 'AWAY' : 'DRAW');
 
-/** Every winning selection of a final score, as MARKET:CODE. */
-export function winningSelections(home: number, away: number): string[] {
+/** Every winning selection of a final score, as MARKET:CODE. The total market compares with the event's line. */
+export function winningSelections(home: number, away: number, totalLine = 2.5): string[] {
   const result = winningCode(home, away);
   const doubles = { HOME: ['1X', '12'], DRAW: ['1X', 'X2'], AWAY: ['12', 'X2'] }[result as 'HOME' | 'DRAW' | 'AWAY'];
   return [
     `MATCH:${result}`,
     ...doubles.map((code) => `DOUBLE:${code}`),
-    `GOALS:${home + away > 2 ? 'OVER' : 'UNDER'}`,
+    `GOALS:${home + away > totalLine ? 'OVER' : 'UNDER'}`,
     `BTTS:${home > 0 && away > 0 ? 'YES' : 'NO'}`,
   ];
 }
@@ -107,7 +112,7 @@ export class BettingService {
   async board() {
     const { rows } = await this.db.query<BoardRow>(
       `SELECT e.id AS event_id, e.sport, e.league, e.home, e.away, e.starts_at, e.status, e.minute,
-              e.home_score, e.away_score, e.version, s.id AS selection_id, s.market, s.code, s.odds_x100, s.suspended
+              e.home_score, e.away_score, e.version, e.total_line, s.id AS selection_id, s.market, s.code, s.odds_x100, s.suspended
        FROM sports_events e JOIN selections s ON s.event_id = e.id
        WHERE e.status <> 'FINISHED' OR e.updated_at > now() - interval '10 minutes'
        ORDER BY CASE e.status WHEN 'LIVE' THEN 0 WHEN 'SCHEDULED' THEN 1 ELSE 2 END, e.starts_at, e.id,
@@ -124,6 +129,7 @@ export class BettingService {
       status: row.status,
       minute: row.minute,
       score: [row.home_score, row.away_score] as [number, number],
+      totalLine: Number(row.total_line),
       version: row.version,
       selections: [] as Array<{ id: number; market: MarketCode; code: SelectionCode; odds: number; suspended: boolean }>,
     });
@@ -231,14 +237,14 @@ export class BettingService {
    */
   async settleEvent(eventId: number): Promise<{ won: number; lost: number }> {
     return this.db.transaction(async (client) => {
-      const event = await client.query<{ status: string; home_score: number; away_score: number }>(
-        'SELECT status, home_score, away_score FROM sports_events WHERE id = $1 FOR UPDATE',
+      const event = await client.query<{ status: string; home_score: number; away_score: number; total_line: string }>(
+        'SELECT status, home_score, away_score, total_line FROM sports_events WHERE id = $1 FOR UPDATE',
         [eventId],
       );
       if (event.rows.length === 0) {
         throw new AppError(404, 'EVENT_NOT_FOUND', 'Event not found');
       }
-      const { status, home_score: home, away_score: away } = event.rows[0];
+      const { status, home_score: home, away_score: away, total_line: totalLine } = event.rows[0];
       if (status !== 'FINISHED') {
         throw new AppError(409, 'EVENT_NOT_FINISHED', 'Only finished events can be settled');
       }
@@ -249,7 +255,7 @@ export class BettingService {
          FROM selections s
          WHERE b.selection_id = s.id AND s.event_id = $1 AND b.status = 'OPEN'
          RETURNING b.id, b.pos_id, b.potential_payout, b.status`,
-        [eventId, winningSelections(home, away)],
+        [eventId, winningSelections(home, away, Number(totalLine))],
       );
 
       // Credit winners in a fixed order of stores, so two settlements never deadlock on balances.
