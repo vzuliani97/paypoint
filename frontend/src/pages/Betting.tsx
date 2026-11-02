@@ -217,7 +217,7 @@ export function LiveBetting({ token, onCompleted, onUnauthorized }: Props) {
 
       <section className="sb-board" aria-label="Partidos">
         {open ? (
-          <EventDetail event={open} moves={moves} pickedId={pick?.selectionId} onPick={(selection) => choose(open, selection)} onBack={() => setOpenId(null)} />
+          <EventDetail event={open} moves={moves} scored={Boolean(goals[open.id])} pickedId={pick?.selectionId} onPick={(selection) => choose(open, selection)} onBack={() => setOpenId(null)} />
         ) : (
           <>
         <div className="sb-hero">
@@ -478,13 +478,14 @@ const crest = (name: string) => ({
 interface DetailProps {
   event: BoardEvent;
   moves: Record<number, 'up' | 'down'>;
+  scored: boolean;
   pickedId?: number;
   onPick: (selection: Selection) => void;
   onBack: () => void;
 }
 
 /** One match with every market, like the event page of a sportsbook. */
-function EventDetail({ event, moves, pickedId, onPick, onBack }: DetailProps) {
+function EventDetail({ event, moves, scored, pickedId, onPick, onBack }: DetailProps) {
   const [tab, setTab] = useState('ALL');
   const markets = DETAIL_TABS.find(([id]) => id === tab)![2];
   const progress = event.status === 'FINISHED' ? 100 : Math.min(100, Math.round((event.minute / SPORTS[event.sport].length) * 100));
@@ -519,6 +520,7 @@ function EventDetail({ event, moves, pickedId, onPick, onBack }: DetailProps) {
         <div className="sb-progress" role="progressbar" aria-label="Tiempo jugado" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
           <span style={{ width: `${progress}%` }} />
         </div>
+        <LiveTracker event={event} scored={scored} />
         <p className="sb-muted">En tiempo real con un feed simulado: los datos de producción son confidenciales.</p>
       </div>
 
@@ -557,5 +559,104 @@ function EventDetail({ event, moves, pickedId, onPick, onBack }: DetailProps) {
         );
       })}
     </div>
+  );
+}
+
+const SCORE_WORD: Record<Sport, string> = { FUTBOL: '¡GOL!', BALONCESTO: '¡CANASTA!', BEISBOL: '¡CARRERA!', HOCKEY: '¡GOL!' };
+
+/** The playing surface of each sport, drawn in a 400 x 220 box. */
+function Surface({ sport }: { sport: Sport }) {
+  if (sport === 'BALONCESTO') {
+    return (
+      <g>
+        <rect width="400" height="220" fill="#c98a4b" />
+        <rect x="10" y="10" width="380" height="200" fill="none" stroke="#fff6" strokeWidth="2" />
+        <line x1="200" y1="10" x2="200" y2="210" stroke="#fff6" strokeWidth="2" />
+        <circle cx="200" cy="110" r="26" fill="none" stroke="#fff6" strokeWidth="2" />
+        <rect x="10" y="80" width="70" height="60" fill="#a8663066" stroke="#fff6" strokeWidth="2" />
+        <rect x="320" y="80" width="70" height="60" fill="#a8663066" stroke="#fff6" strokeWidth="2" />
+        <path d="M10 30 A 95 95 0 0 1 10 190" transform="translate(28 0)" fill="none" stroke="#fff6" strokeWidth="2" />
+        <path d="M390 30 A 95 95 0 0 0 390 190" transform="translate(-28 0)" fill="none" stroke="#fff6" strokeWidth="2" />
+        <circle cx="26" cy="110" r="6" fill="none" stroke="#ff7a00" strokeWidth="3" />
+        <circle cx="374" cy="110" r="6" fill="none" stroke="#ff7a00" strokeWidth="3" />
+      </g>
+    );
+  }
+  if (sport === 'BEISBOL') {
+    return (
+      <g>
+        <rect width="400" height="220" fill="#2f7d3b" />
+        <path d="M200 205 L70 80 A 185 185 0 0 1 330 80 Z" fill="#3b9147" />
+        <path d="M200 200 L130 130 L200 60 L270 130 Z" fill="#b5835a" />
+        <path d="M200 185 L145 130 L200 75 L255 130 Z" fill="#3b9147" />
+        {[
+          [200, 200],
+          [270, 130],
+          [200, 60],
+          [130, 130],
+        ].map(([x, y]) => (
+          <rect key={`${x}-${y}`} x={x - 5} y={y - 5} width="10" height="10" fill="#fff" transform={`rotate(45 ${x} ${y})`} />
+        ))}
+        <circle cx="200" cy="130" r="7" fill="#b5835a" />
+      </g>
+    );
+  }
+  if (sport === 'HOCKEY') {
+    return (
+      <g>
+        <rect width="400" height="220" rx="60" fill="#eef4fb" />
+        <rect x="4" y="4" width="392" height="212" rx="58" fill="none" stroke="#9fb3c8" strokeWidth="3" />
+        <line x1="200" y1="4" x2="200" y2="216" stroke="#d62839" strokeWidth="4" />
+        <line x1="140" y1="4" x2="140" y2="216" stroke="#1d4ed8" strokeWidth="4" />
+        <line x1="260" y1="4" x2="260" y2="216" stroke="#1d4ed8" strokeWidth="4" />
+        <line x1="32" y1="4" x2="32" y2="216" stroke="#d62839" strokeWidth="2" />
+        <line x1="368" y1="4" x2="368" y2="216" stroke="#d62839" strokeWidth="2" />
+        <circle cx="200" cy="110" r="22" fill="none" stroke="#1d4ed8" strokeWidth="2" />
+        <path d="M32 96 A 14 14 0 0 1 32 124" fill="#93c5fd" />
+        <path d="M368 96 A 14 14 0 0 0 368 124" fill="#93c5fd" />
+      </g>
+    );
+  }
+  return (
+    <g>
+      <rect width="400" height="220" fill="#2e8b3d" />
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((stripe) => (
+        <rect key={stripe} x={stripe * 50} width="25" height="220" fill="#ffffff10" />
+      ))}
+      <rect x="10" y="10" width="380" height="200" fill="none" stroke="#fffb" strokeWidth="2" />
+      <line x1="200" y1="10" x2="200" y2="210" stroke="#fffb" strokeWidth="2" />
+      <circle cx="200" cy="110" r="28" fill="none" stroke="#fffb" strokeWidth="2" />
+      <rect x="10" y="62" width="56" height="96" fill="none" stroke="#fffb" strokeWidth="2" />
+      <rect x="334" y="62" width="56" height="96" fill="none" stroke="#fffb" strokeWidth="2" />
+      <rect x="10" y="88" width="20" height="44" fill="none" stroke="#fffb" strokeWidth="2" />
+      <rect x="370" y="88" width="20" height="44" fill="none" stroke="#fffb" strokeWidth="2" />
+      <rect x="2" y="96" width="8" height="28" fill="#fff" />
+      <rect x="390" y="96" width="8" height="28" fill="#fff" />
+    </g>
+  );
+}
+
+/**
+ * A live-tracker style view of the event. Score, clock and the scoring flash come from the feed; the moving
+ * ball is only an animation, labeled as such, because the simulated feed has no play-by-play positions.
+ */
+function LiveTracker({ event, scored }: { event: BoardEvent; scored: boolean }) {
+  const live = event.status === 'LIVE';
+  return (
+    <figure className={`sb-tracker ${event.sport.toLowerCase()}`} aria-label={`Visualización de ${SPORTS[event.sport].label}: ${event.home} ${event.score[0]}, ${event.away} ${event.score[1]}`}>
+      <svg viewBox="0 0 400 220" role="presentation">
+        <Surface sport={event.sport} />
+        {live && <circle className="sb-tracker-ball" cx="200" cy="110" r={event.sport === 'BALONCESTO' ? 7 : 5} />}
+      </svg>
+      <figcaption>
+        <span className="sb-tracker-team">{event.home}</span>
+        <strong>
+          {event.score[0]} - {event.score[1]}
+        </strong>
+        <span className="sb-tracker-team">{event.away}</span>
+      </figcaption>
+      <span className="sb-tracker-tag">{live ? `${clock(event)} · Visualización` : event.status === 'FINISHED' ? 'Final' : 'Por iniciar'}</span>
+      {scored && <span className="sb-tracker-flash">{SCORE_WORD[event.sport]}</span>}
+    </figure>
   );
 }

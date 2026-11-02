@@ -1675,3 +1675,113 @@ button.sb-teams:hover span {
 .sb-odd-gap {
   min-height: 42px;
 }
+
+/* ---------- Sportsbook: live tracker ---------- */
+
+.sb-tracker {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--sb-line);
+  border-radius: 14px;
+  background: #0b2a12;
+}
+
+.sb-tracker svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sb-tracker-ball {
+  fill: #fff;
+  stroke: #111;
+  stroke-width: 1.5;
+  animation: tracker-play 9s ease-in-out infinite;
+}
+
+.sb-tracker.baloncesto .sb-tracker-ball {
+  fill: #ff7a00;
+}
+
+.sb-tracker.hockey .sb-tracker-ball {
+  fill: #111;
+  stroke: #444;
+}
+
+@keyframes tracker-play {
+  0% { transform: translate(0, 0); }
+  15% { transform: translate(-70px, -40px); }
+  30% { transform: translate(-150px, 10px); }
+  42% { transform: translate(-60px, 50px); }
+  55% { transform: translate(40px, -30px); }
+  70% { transform: translate(130px, 20px); }
+  85% { transform: translate(160px, -10px); }
+  100% { transform: translate(0, 0); }
+}
+
+.sb-tracker figcaption {
+  position: absolute;
+  top: 0.6rem;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: rgb(10 16 32 / 78%);
+  color: #fff;
+  font-size: 0.82rem;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.sb-tracker figcaption strong {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-tracker-team {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-tracker-tag {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.5rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(10 16 32 / 70%);
+  color: #dbe6ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.sb-tracker-flash {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(10 16 32 / 45%);
+  color: #fff;
+  font-size: 2.6rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 6px 30px rgb(0 0 0 / 60%);
+  animation: tracker-flash 1.6s ease-out both;
+}
+
+@keyframes tracker-flash {
+  0% { opacity: 0; transform: scale(0.7); }
+  20% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-tracker-ball,
+  .sb-tracker-flash {
+    animation: none;
+  }
+}
