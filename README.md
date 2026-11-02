@@ -193,7 +193,7 @@ Highlights: 70-way concurrency on balance and idempotency, refunds exactly once,
 
 ## Known limitations
 
-- **Betting and casino are a demonstration.** The production platforms and their data are confidential, so teams, leagues and games here are fictitious and the odds feed and game provider are simulated, running in real time. A real operator in Colombia needs a Coljuegos license; this code is not one.
+- **Betting and casino are a demonstration.** The production platforms and their data are confidential, so teams, leagues and games here are fictitious and the odds feed and game provider are simulated, running in real time. Real online betting in Colombia requires a Coljuegos license, and there are no responsible-gaming limits, player accounts or KYC here: the "wallet" is the store's prepaid balance.
 
 - **Reconciliation of `PENDING` sales** is not implemented yet (a job that asks the provider and confirms or refunds).
 - HMAC secrets are stored in plain text in the database. Production would use KMS or Secrets Manager.
