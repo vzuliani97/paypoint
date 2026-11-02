@@ -109,11 +109,15 @@ The admin creates points of sale, credits their balances and watches sales acros
 
 ## Stack
 
-- **Backend:** NestJS 11, TypeScript, PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations), Zod, JWT, bcrypt, Helmet, Prometheus metrics
-- **Frontend:** React 19 + TypeScript (Vite), served by unprivileged nginx
-- **Real time:** Server-Sent Events for the live odds board, a simulated odds feed with one leader across replicas (PostgreSQL advisory lock)
-- **Quality:** Jest + Supertest, 54 tests (14 unit, 40 integration against a real PostgreSQL), CodeQL, Gitleaks, `npm audit`, Dependabot
-- **Delivery:** multi-stage Docker images running as non-root, Docker Compose, GitHub Actions publishing to GHCR. Deployed to Kubernetes in [OpsCircuit](https://github.com/vzuliani97/opscircuit).
+| Layer | Technologies |
+|---|---|
+| Frontend | React 19, TypeScript, Vite 8, EventSource for Server-Sent Events, SVG live tracker; served by unprivileged nginx 1.27 |
+| Backend | Node.js 24, NestJS 11, Zod 4, JWT, bcrypt, Helmet, HMAC-SHA256, Server-Sent Events |
+| Data | PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations, advisory locks, append-only ledger) |
+| Infrastructure and DevOps | Docker multi-stage images running as non-root, Docker Compose, multi-arch images on GHCR, deployed to Kubernetes by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit) |
+| CI/CD and quality | GitHub Actions (actions pinned by SHA), Jest + Supertest: 54 tests (14 unit, 40 integration against a real PostgreSQL), Dependabot |
+| Security | CodeQL, Gitleaks, `npm audit`, an image-metadata check, login lockout, IP allowlist |
+| Observability | Prometheus metrics (`prom-client`), scraped by OpsCircuit |
 
 ## Architecture
 
