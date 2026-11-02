@@ -111,12 +111,12 @@ The admin creates points of sale, credits their balances and watches sales acros
 
 | Layer | Technologies |
 |---|---|
-| Frontend | React 19, TypeScript, Vite 8, EventSource for Server-Sent Events, SVG live tracker; served by unprivileged nginx 1.27 |
+| Frontend | React 19, TypeScript, Vite 8, EventSource for Server-Sent Events, SVG live tracker; served by unprivileged nginx 1.30 with a strict Content-Security-Policy |
 | Backend | Node.js 24, NestJS 11, Zod 4, JWT, bcrypt, Helmet, HMAC-SHA256, Server-Sent Events |
 | Data | PostgreSQL 16 (plain SQL with the `pg` driver, versioned migrations, advisory locks, append-only ledger) |
 | Infrastructure and DevOps | Docker multi-stage images running as non-root, Docker Compose, multi-arch images on GHCR, deployed to Kubernetes by Argo CD in [OpsCircuit](https://github.com/vzuliani97/opscircuit) |
 | CI/CD and quality | GitHub Actions (actions pinned by SHA), Jest + Supertest: 54 tests (14 unit, 40 integration against a real PostgreSQL), Dependabot |
-| Security | CodeQL, Gitleaks, `npm audit`, an image-metadata check, login lockout, IP allowlist |
+| Security | CodeQL, Gitleaks, `npm audit`, Trivy image scan, OWASP ZAP baseline (DAST), SBOM and SLSA provenance, cosign keyless signing, an image-metadata check, login lockout, IP allowlist |
 | Observability | Prometheus metrics (`prom-client`), scraped by OpsCircuit |
 
 ## Architecture
@@ -193,7 +193,16 @@ Highlights: 70-way concurrency on balance and idempotency, refunds exactly once,
 - Strict Zod validation (unknown fields rejected), 10 KB body limit, Helmet headers, CORS restricted.
 - nginx overwrites `X-Forwarded-For` and the API trusts exactly one proxy hop, so clients can't spoof their IP into the allowlist. nginx also fails fast (504 after 3 s) when the API is down.
 - `/metrics` is internal only, because nginx routes just `/api` and `/health`.
-- CI: Gitleaks over the full git history, `npm audit --omit=dev --audit-level=high`, CodeQL, actions pinned to commit SHAs, least-privilege `GITHUB_TOKEN`.
+- nginx serves the app with a strict Content-Security-Policy (`default-src 'self'`, no plugins, no framing), `nosniff`, `Referrer-Policy: no-referrer`, a Permissions-Policy and COOP/CORP, and does not reveal its version.
+- The runtime images carry no package manager: npm, npx, corepack and yarn are removed from the API image, and Alpine security fixes are applied to the nginx image at build time.
+- CI: Gitleaks over the full git history, `npm audit --omit=dev --audit-level=high` and CodeQL. Trivy fails the build on any fixable critical or high CVE in the images, and an OWASP ZAP baseline scan of the running stack fails it on any warning not accepted, with its reason, in [`.zap/rules.tsv`](.zap/rules.tsv). Actions are pinned to commit SHAs, scanner images to digests, and `GITHUB_TOKEN` is least-privilege.
+- Published images carry an SBOM and SLSA build provenance, and are signed with cosign keyless (Sigstore), so a cluster can refuse anything this workflow did not build. To verify one:
+
+```bash
+cosign verify ghcr.io/vzuliani97/paypoint-backend:main \
+  --certificate-identity https://github.com/vzuliani97/nekobet/.github/workflows/ci.yml@refs/heads/main \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
 
 ## Known limitations
 
