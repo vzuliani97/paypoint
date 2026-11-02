@@ -209,4 +209,4 @@ Highlights: 70-way concurrency on balance and idempotency, refunds exactly once,
 
 MIT.
 
-Independent portfolio reconstruction based on engineering patterns from professional work. It uses synthetic data and contains no employer code or confidential information. AI-assisted; verified through tests and CI.
+Independent portfolio reconstruction based on engineering patterns from professional work. It uses synthetic data and contains no employer code or confidential information.
